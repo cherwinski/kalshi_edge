@@ -109,6 +109,68 @@ def list_signals(limit: int = 100) -> List[Dict[str, Any]]:
     return get_recent_signals(limit=limit)
 
 
+@app.get("/positions")
+def list_positions() -> List[Dict[str, Any]]:
+    conn = get_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            """
+            SELECT p.market_ticker, p.side, p.size, p.avg_entry_price, p.realized_pnl, m.category, m.expiration_ts
+            FROM positions p
+            LEFT JOIN markets m ON p.market_ticker = m.market_id
+            ORDER BY p.updated_at DESC
+            """
+        )
+        rows = cur.fetchall()
+    finally:
+        conn.close()
+    keys = ["market_ticker", "side", "size", "avg_entry_price", "realized_pnl", "category", "expiration_ts"]
+    return [dict(zip(keys, row)) for row in rows]
+
+
+@app.get("/pnl/daily")
+def list_daily_pnl(limit: int = 90) -> List[Dict[str, Any]]:
+    conn = get_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            """
+            SELECT as_of_date, realized_pnl, unrealized_pnl, total_equity
+            FROM account_pnl
+            ORDER BY as_of_date DESC
+            LIMIT %s
+            """,
+            (limit,),
+        )
+        rows = cur.fetchall()
+    finally:
+        conn.close()
+    keys = ["as_of_date", "realized_pnl", "unrealized_pnl", "total_equity"]
+    return [dict(zip(keys, row)) for row in rows][::-1]
+
+
+@app.get("/pnl/trades")
+def list_trades(limit: int = 100) -> List[Dict[str, Any]]:
+    conn = get_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            """
+            SELECT executed_at, market_ticker, side, direction, size, price
+            FROM trades
+            ORDER BY executed_at DESC
+            LIMIT %s
+            """,
+            (limit,),
+        )
+        rows = cur.fetchall()
+    finally:
+        conn.close()
+    keys = ["executed_at", "market_ticker", "side", "direction", "size", "price"]
+    return [dict(zip(keys, row)) for row in rows]
+
+
 @app.get("/")
 def dashboard(request: Request) -> Any:
     latest = get_all_latest_backtest_results()
@@ -133,5 +195,8 @@ def dashboard(request: Request) -> Any:
             },
             "thresholds": thresholds,
             "signals": get_recent_signals(limit=50),
+            "positions": list_positions(),
+            "trades": list_trades(limit=50),
+            "pnl_series": list_daily_pnl(limit=90),
         },
     )

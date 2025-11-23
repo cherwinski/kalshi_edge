@@ -101,7 +101,7 @@ def generate_signals(ev_threshold: float = EV_THRESHOLD_DEFAULT, max_signals: in
 
             # YES side EV
             ev_yes = p_true - float(p_mkt)
-            # NO side EV
+            # NO side EV (selling YES / buying NO)
             ev_no = (1.0 - p_true) - (1.0 - float(p_mkt))
 
             info = meta.get(market_id, {})

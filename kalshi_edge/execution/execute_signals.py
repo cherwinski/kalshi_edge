@@ -7,6 +7,7 @@ from kalshi_edge.config import get_execution_mode, get_risk_limits, get_kalshi_e
 from kalshi_edge.db import get_connection
 from kalshi_edge.execution.client import ExecutionClient, OrderRequest
 from kalshi_edge.util.logging import get_logger
+from kalshi_edge.portfolio.pnl import record_trade
 
 LOGGER = get_logger(__name__)
 
@@ -70,6 +71,16 @@ def compute_existing_risk(conn) -> Dict[str, Any]:
     for market_ticker, side, p_mkt, size in cur.fetchall():
         sig = {"market_ticker": market_ticker, "side": side, "p_mkt": float(p_mkt), "size": int(size)}
         r = estimate_trade_risk_usd(sig)
+        per_market[market_ticker] = per_market.get(market_ticker, 0.0) + r
+        total += r
+
+    # include open positions risk
+    cur.execute("SELECT market_ticker, side, size, avg_entry_price FROM positions")
+    for market_ticker, side, size, avg_price in cur.fetchall():
+        if side == "yes":
+            r = abs(avg_price * size)
+        else:
+            r = abs((1.0 - avg_price) * size)
         per_market[market_ticker] = per_market.get(market_ticker, 0.0) + r
         total += r
     return {"total": total, "per_market": per_market}
@@ -148,6 +159,7 @@ def execute_signals(batch_limit: int = 50) -> int:
     for sig in signals:
         sig_id = sig["id"]
         market_ticker = sig["market_ticker"]
+        trade_direction = "buy"  # buy YES or buy NO; selling paths can be added later.
         risk_new = estimate_trade_risk_usd(sig)
 
         if risk_new > limits["max_risk_per_trade"]:
@@ -186,6 +198,16 @@ def execute_signals(batch_limit: int = 50) -> int:
                 executed_price=float(sig["p_mkt"]),
                 executed_size=int(sig["size"]),
             )
+            record_trade(
+                {
+                    "signal_id": sig_id,
+                    "market_ticker": market_ticker,
+                    "side": sig["side"],
+                    "size": int(sig["size"]),
+                    "price": float(sig["p_mkt"]),
+                    "direction": trade_direction,
+                }
+            )
         else:
             try:
                 limit_price = float(sig["p_mkt"])
@@ -194,15 +216,10 @@ def execute_signals(batch_limit: int = 50) -> int:
                     side=sig["side"],
                     size=int(sig["size"]),
                     price=limit_price,
+                    direction=trade_direction,
                 )
                 if client is None:
                     raise RuntimeError("Execution client not initialized; cannot send live orders")
-                order_req = OrderRequest(
-                    market_ticker=market_ticker,
-                    side=sig["side"],
-                    size=int(sig["size"]),
-                    price=limit_price,
-                )
                 resp = client.place_order(order_req)  # type: ignore[arg-type]
                 order_id = str(resp.get("order_id") or resp.get("id") or "")
                 executed_price = float(resp.get("avg_price") or limit_price)
@@ -215,6 +232,16 @@ def execute_signals(batch_limit: int = 50) -> int:
                     order_id=order_id,
                     executed_price=executed_price,
                     executed_size=executed_size,
+                )
+                record_trade(
+                    {
+                        "signal_id": sig_id,
+                        "market_ticker": market_ticker,
+                        "side": sig["side"],
+                        "size": executed_size,
+                        "price": executed_price,
+                        "direction": trade_direction,
+                    }
                 )
             except Exception as exc:  # pragma: no cover - defensive
                 update_signal_execution(

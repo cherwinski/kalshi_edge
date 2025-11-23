@@ -15,6 +15,8 @@ from .backtest.strategy_threshold import run_threshold_backtest
 from .ingest import historical_ingest
 from .signals.generate_signals import generate_signals
 from .execution.execute_signals import execute_signals
+from .portfolio.sync_positions import sync_positions
+from .portfolio.pnl import snapshot_account_pnl
 from .util.logging import get_logger
 
 LOGGER = get_logger(__name__)
@@ -109,6 +111,18 @@ def run_all_backtests() -> None:
         LOGGER.info("Execution processed %s signals", processed)
     except Exception as exc:  # pragma: no cover - defensive
         LOGGER.exception("Error executing signals: %s", exc)
+
+    try:
+        synced = sync_positions()
+        LOGGER.info("Synced %s positions from Kalshi portfolio", synced)
+    except Exception as exc:  # pragma: no cover - defensive
+        LOGGER.exception("Error syncing positions: %s", exc)
+
+    try:
+        snapshot_account_pnl()
+        LOGGER.info("Account PnL snapshot stored")
+    except Exception as exc:  # pragma: no cover - defensive
+        LOGGER.exception("Error snapshotting PnL: %s", exc)
 
 
 def _safe_job(job: Callable[..., Any], *args: Any, **kwargs: Any) -> None:

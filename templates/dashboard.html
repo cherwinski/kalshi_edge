@@ -57,9 +57,81 @@
   {% endif %}
 </section>
 <section class="chart-container">
-  <h2>Calibration</h2>
+  <h2>Calibration <small>(Samples: <span id="calibration-count">--</span>)</small></h2>
   <canvas id="calibrationChart"></canvas>
   <p id="calibration-error" style="color: red; display: none;">Error loading calibration data.</p>
+</section>
+
+<section class="card" style="margin-top: 1rem;">
+  <h2>Portfolio Exposure</h2>
+  {% if positions %}
+  <table style="width: 100%; border-collapse: collapse;">
+    <thead>
+      <tr>
+        <th style="text-align:left;padding:4px;">Market</th>
+        <th style="text-align:left;padding:4px;">Side</th>
+        <th style="text-align:left;padding:4px;">Size</th>
+        <th style="text-align:left;padding:4px;">Avg Entry</th>
+        <th style="text-align:left;padding:4px;">Realized PnL</th>
+        <th style="text-align:left;padding:4px;">Category</th>
+        <th style="text-align:left;padding:4px;">Expiry</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for pos in positions %}
+      <tr>
+        <td style="padding:4px;">{{ pos.market_ticker }}</td>
+        <td style="padding:4px;">{{ pos.side }}</td>
+        <td style="padding:4px;">{{ pos.size }}</td>
+        <td style="padding:4px;">{{ "%.4f"|format(pos.avg_entry_price) }}</td>
+        <td style="padding:4px;">{{ "%.4f"|format(pos.realized_pnl) }}</td>
+        <td style="padding:4px;">{{ pos.category or "" }}</td>
+        <td style="padding:4px;">{{ pos.expiration_ts or "" }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+    <p>No positions tracked yet.</p>
+  {% endif %}
+</section>
+
+<section class="card" style="margin-top: 1rem;">
+  <h2>Equity Curve</h2>
+  <canvas id="pnlChart"></canvas>
+  <p id="pnl-error" style="color:red; display:none;">Error loading PnL data.</p>
+</section>
+
+<section class="card" style="margin-top: 1rem;">
+  <h2>Recent Trades</h2>
+  {% if trades %}
+  <table style="width: 100%; border-collapse: collapse;">
+    <thead>
+      <tr>
+        <th style="text-align:left;padding:4px;">Time</th>
+        <th style="text-align:left;padding:4px;">Market</th>
+        <th style="text-align:left;padding:4px;">Side</th>
+        <th style="text-align:left;padding:4px;">Dir</th>
+        <th style="text-align:left;padding:4px;">Size</th>
+        <th style="text-align:left;padding:4px;">Price</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for t in trades %}
+      <tr>
+        <td style="padding:4px;">{{ t.executed_at }}</td>
+        <td style="padding:4px;">{{ t.market_ticker }}</td>
+        <td style="padding:4px;">{{ t.side }}</td>
+        <td style="padding:4px;">{{ t.direction }}</td>
+        <td style="padding:4px;">{{ t.size }}</td>
+        <td style="padding:4px;">{{ "%.4f"|format(t.price) }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+    <p>No trades recorded yet.</p>
+  {% endif %}
 </section>
 
 <section class="card" style="margin-top: 1rem;">
@@ -116,6 +188,9 @@
       const res = await fetch('/calibration');
       if (!res.ok) throw new Error('Failed to load calibration');
       const buckets = await res.json();
+      const totalSamples = buckets.reduce((acc, b) => acc + (b.n || 0), 0);
+      const countEl = document.getElementById('calibration-count');
+      if (countEl) countEl.textContent = totalSamples;
       const xs = buckets.map(b => (b.bucket_low + b.bucket_high) / 2);
       const ys = buckets.map(b => b.p_true ?? 0);
       const perfect = xs;
@@ -156,6 +231,38 @@
     }
   }
 
+  function loadPnlChart() {
+    const series = {{ pnl_series|tojson }};
+    if (!series || series.length === 0) {
+      document.getElementById('pnl-error').style.display = 'block';
+      return;
+    }
+    const labels = series.map(p => p.as_of_date);
+    const realized = series.map(p => p.realized_pnl);
+    const unrealized = series.map(p => p.unrealized_pnl);
+    const equity = series.map(p => p.total_equity);
+    const ctx = document.getElementById('pnlChart').getContext('2d');
+    new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [
+          { label: 'Equity', data: equity, borderColor: 'rgba(75, 192, 192, 1)', fill: false },
+          { label: 'Realized', data: realized, borderColor: 'rgba(54, 162, 235, 1)', borderDash: [4, 4], fill: false },
+          { label: 'Unrealized', data: unrealized, borderColor: 'rgba(255, 159, 64, 1)', borderDash: [2, 6], fill: false },
+        ],
+      },
+      options: {
+        responsive: true,
+        scales: {
+          x: { title: { display: true, text: 'Date' } },
+          y: { title: { display: true, text: 'PnL / Equity (USD)' } },
+        },
+      },
+    });
+  }
+
   loadCalibration();
+  loadPnlChart();
 </script>
 {% endblock %}

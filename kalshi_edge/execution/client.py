@@ -20,6 +20,7 @@ class OrderRequest:
     side: str  # "yes" or "no"
     size: int
     price: Optional[float]  # limit price in dollars, or None for market if supported
+    direction: str = "buy"  # "buy" or "sell"
 
 
 class ExecutionClient:
@@ -40,8 +41,11 @@ class ExecutionClient:
         """Place an order via the Trading API."""
 
         side = order.side.lower()
+        direction = order.direction.lower()
         if side not in ("yes", "no"):
             raise ValueError("order.side must be 'yes' or 'no'")
+        if direction not in ("buy", "sell"):
+            raise ValueError("order.direction must be 'buy' or 'sell'")
 
         price_cents: Optional[int] = None
         if order.price is not None:
@@ -50,7 +54,7 @@ class ExecutionClient:
         req_kwargs: Dict[str, Any] = {
             "ticker": order.market_ticker,
             "side": side.upper(),
-            "action": "BUY",
+            "action": direction.upper(),
             "type": "LIMIT",
             "count": int(order.size),
         }
@@ -63,13 +67,16 @@ class ExecutionClient:
         resp = self.portfolio_api.create_order(create_order_request=create_req)
         order_obj = resp.order if hasattr(resp, "order") else None
 
+        avg_price_raw = (
+            getattr(order_obj, "yes_price", None) if side == "yes" else getattr(order_obj, "no_price", None)
+        )
+        avg_price = (avg_price_raw / 100.0) if avg_price_raw is not None else None
+
         return {
             "order_id": getattr(order_obj, "order_id", None),
             "status": getattr(order_obj, "status", None),
             "filled_size": getattr(order_obj, "count", None),
-            "avg_price": getattr(order_obj, "yes_price", None)
-            if side == "yes"
-            else getattr(order_obj, "no_price", None),
+            "avg_price": avg_price,
             "raw": resp.to_dict() if hasattr(resp, "to_dict") else resp,
         }
 

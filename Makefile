@@ -47,6 +47,12 @@ signals:
 execute-signals:
 	poetry run python -m kalshi_edge.execution.execute_signals
 
+sync-positions:
+	poetry run python -m kalshi_edge.portfolio.sync_positions
+
+snapshot-pnl:
+	poetry run python -m kalshi_edge.portfolio.pnl
+
 test-live-order:
 	poetry run python scripts/test_live_order.py
 
