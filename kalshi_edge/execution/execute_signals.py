@@ -320,11 +320,30 @@ def execute_signals(batch_limit: int = 50) -> int:
                 )
                 if client is None:
                     raise RuntimeError("Execution client not initialized; cannot send live orders")
+                LOGGER.info(
+                    "Placing order live env=%s sig=%s ticker=%s side=%s size=%s price=%.4f",
+                    env,
+                    sig_id,
+                    market_ticker,
+                    sig["side"],
+                    size,
+                    limit_price,
+                )
                 resp = client.place_order(order_req)  # type: ignore[arg-type]
                 order_id = str(resp.get("order_id") or resp.get("id") or "")
                 executed_price = float(resp.get("avg_price") or limit_price)
                 executed_size = int(resp.get("filled_size") or size)
                 status = resp.get("status") or "sent"
+                LOGGER.info(
+                    "Order response sig=%s ticker=%s status=%s order_id=%s filled=%s price=%.4f raw=%s",
+                    sig_id,
+                    market_ticker,
+                    status,
+                    order_id,
+                    executed_size,
+                    executed_price,
+                    resp,
+                )
                 update_signal_execution(
                     sig_id,
                     status=status,
