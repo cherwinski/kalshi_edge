@@ -6,6 +6,7 @@ from typing import Any, Dict, List
 
 from fastapi import FastAPI, Request
 from fastapi.templating import Jinja2Templates
+from datetime import datetime, timezone
 
 from ..backtest.results_store import (
     get_all_latest_backtest_results,
@@ -207,8 +208,17 @@ def get_current_exposure() -> Dict[str, float]:
     conn = get_connection()
     try:
         cur = conn.cursor()
-        cur.execute("SELECT side, avg_entry_price, size FROM positions")
-        for side, avg_price, size in cur.fetchall():
+        cur.execute(
+            """
+            SELECT p.side, p.avg_entry_price, p.size, m.expiration_ts
+            FROM positions p
+            LEFT JOIN markets m ON p.market_ticker = m.market_id
+            """
+        )
+        now = datetime.now(timezone.utc)
+        for side, avg_price, size, expiration_ts in cur.fetchall():
+            if expiration_ts and expiration_ts < now:
+                continue  # ignore expired markets
             pos_risk += _risk(side, avg_price, size)
 
         cur.execute(
