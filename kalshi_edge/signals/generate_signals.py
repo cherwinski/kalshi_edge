@@ -23,6 +23,7 @@ PRO_INPLAY_BAND_LOW = 0.88
 PRO_INPLAY_BAND_HIGH = 0.92
 SPORTS_INPLAY_MAX_REMAINING = timedelta(minutes=30)
 SPORT_TICKER_HINTS = ("NFL", "NBA", "NHL", "MLB", "EPL", "MLS", "NCAAF", "NCAAB", "START", "GAME")
+WEATHER_MIN_P = 0.03
 
 
 def _build_probability_lookup() -> Callable[[float], float]:
@@ -137,6 +138,11 @@ def generate_signals(ev_threshold: float = EV_THRESHOLD_DEFAULT, max_signals: in
                 or any(hint in ticker_upper for hint in SPORT_TICKER_HINTS)
             )
             price = float(p_mkt)
+
+            # Skip low-probability weather markets (<3%).
+            if "weather" in cat_lower and price < WEATHER_MIN_P and p_true < WEATHER_MIN_P:
+                LOGGER.debug("Skipping weather market %s due to low prob (p=%.3f, p_true=%.3f)", market_id, price, p_true)
+                continue
 
             # Primary rule: only 88-92% band unless an explicit override applies.
             allow_band = PRO_INPLAY_BAND_LOW <= price <= PRO_INPLAY_BAND_HIGH
