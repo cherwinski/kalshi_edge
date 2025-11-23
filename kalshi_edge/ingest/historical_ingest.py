@@ -50,17 +50,17 @@ def _parse_dt(value: Any) -> Optional[datetime]:
 
 
 def normalize_market(market: Dict[str, Any]) -> Dict[str, Any]:
+    # Prefer expected/close times (game start) as expiration, fall back to declared expiration.
     exp_candidates = [
-        market.get("expiration_time"),
-        market.get("close_time"),
         market.get("expected_expiration_time"),
+        market.get("close_time"),
+        market.get("expiration_time"),
     ]
     exp_ts = None
     for candidate in exp_candidates:
         dt = _parse_dt(candidate)
-        if dt:
-            if exp_ts is None or dt < exp_ts:
-                exp_ts = dt
+        if dt and (exp_ts is None or dt < exp_ts):
+            exp_ts = dt
 
     return {
         "market_id": market.get("ticker") or market.get("market_id") or market.get("id"),
@@ -306,34 +306,32 @@ def ingest_recent(
                 if (exp_map.get(mid) is not None) and (exp_map.get(mid) <= upper)
             ]
 
-        # Optionally pull event-driven markets (e.g., football) and add them to target_ids.
+        # Optionally pull event-driven markets (sports games) and add them to target_ids.
         if include_events and expire_within_hours is not None:
             upper = now + timedelta(hours=expire_within_hours)
-            for event in client.iter_events_allow_invalid(category="football"):
-                event_ticker = event.get("event_ticker") or event.get("ticker")
-                exp = event.get("close_time") or event.get("expiration_time")
-                exp_dt = None
-                if exp:
-                    try:
-                        exp_dt = datetime.fromisoformat(exp.replace("Z", "+00:00"))
-                    except Exception:
-                        exp_dt = None
-                if exp_dt and exp_dt > upper:
-                    continue
-                if not event_ticker:
-                    continue
-                try:
-                    detail = client.get_event_allow_invalid(event_ticker)
-                except Exception as exc:
-                    LOGGER.warning("Failed to fetch event %s: %s", event_ticker, exc)
-                    continue
-                for mk in detail.get("markets") or []:
-                    normalized = normalize_market(mk)
-                    if not normalized["market_id"]:
+            for sport_cat in ("football", "basketball", "hockey"):
+                for event in client.iter_events_allow_invalid(category=sport_cat):
+                    event_ticker = event.get("event_ticker") or event.get("ticker")
+                    exp = event.get("expected_expiration_time") or event.get("close_time") or event.get("expiration_time")
+                    exp_dt = _parse_dt(exp)
+                    if exp_dt and exp_dt > upper:
                         continue
-                    upsert_market(cursor, normalized)
-                    series_lookup[normalized["market_id"]] = normalized.get("series_ticker")
-                    target_ids.append(normalized["market_id"])
+                    if not event_ticker:
+                        continue
+                    try:
+                        detail = client.get_event_allow_invalid(event_ticker)
+                    except Exception as exc:
+                        LOGGER.warning("Failed to fetch event %s: %s", event_ticker, exc)
+                        continue
+                    for mk in detail.get("markets") or []:
+                        normalized = normalize_market(mk)
+                        if not normalized["market_id"]:
+                            continue
+                        if not normalized.get("series_ticker"):
+                            normalized["series_ticker"] = event_ticker
+                        upsert_market(cursor, normalized)
+                        series_lookup[normalized["market_id"]] = normalized.get("series_ticker")
+                        target_ids.append(normalized["market_id"])
         for market_id in target_ids:
             normalized_market = {
                 "market_id": market_id,
