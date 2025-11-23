@@ -187,20 +187,6 @@ def dashboard(request: Request) -> Any:
         or latest.get("threshold_yes_0.90")
         or latest.get("threshold_yes_0.9")
     )
-
-
-@app.get("/reports")
-def reports(request: Request) -> Any:
-    backtests = list_backtest_results(limit=200)
-    calibrations = list_calibration_results(limit=50)
-    return templates.TemplateResponse(
-        "reports.html",
-        {
-            "request": request,
-            "backtests": backtests,
-            "calibrations": calibrations,
-        },
-    )
     strategy_0_10 = (
         latest.get("strategy_0_10")
         or latest.get("threshold_no_0.10")
@@ -220,5 +206,19 @@ def reports(request: Request) -> Any:
             "positions": list_positions(),
             "trades": list_trades(limit=50),
             "pnl_series": list_daily_pnl(limit=90),
+        },
+    )
+
+
+@app.get("/reports")
+def reports(request: Request) -> Any:
+    backtests = list_backtest_results(limit=200)
+    calibrations = list_calibration_results(limit=50)
+    return templates.TemplateResponse(
+        "reports.html",
+        {
+            "request": request,
+            "backtests": backtests,
+            "calibrations": calibrations,
         },
     )
