@@ -1,28 +1,22 @@
 {% extends "base.html" %}
 {% block content %}
-<section class="grid">
-  <div class="card">
-    <h2>Strategy 0.90</h2>
-    {% if summary.strategy_0_90 %}
-      <p><strong>Trades:</strong> {{ summary.strategy_0_90.num_trades }}</p>
-      <p><strong>Win rate:</strong> {{ "%.2f"|format(summary.strategy_0_90.win_rate * 100) }}%</p>
-      <p><strong>Avg profit:</strong> {{ "%.4f"|format(summary.strategy_0_90.average_profit) }}</p>
-      <p><strong>Total profit:</strong> {{ "%.4f"|format(summary.strategy_0_90.total_profit) }}</p>
-    {% else %}
-      <p>No data yet. Run the scheduler once to populate results.</p>
+<section class="card" style="margin-top: 1rem;">
+  <h2>Signal Status</h2>
+  {% if signal_status %}
+    <p><strong>Pending/Resting/Sent/Simulated:</strong>
+      {{ (signal_status.counts.pending or 0)
+         + (signal_status.counts.resting or 0)
+         + (signal_status.counts.sent or 0)
+         + (signal_status.counts.simulated or 0) }}</p>
+    <p><strong>Executed:</strong> {{ signal_status.counts.executed or 0 }}</p>
+    <p><strong>Ignored:</strong> {{ signal_status.counts.ignored or 0 }}</p>
+    <p><strong>Errors:</strong> {{ signal_status.counts.error or 0 }}</p>
+    {% if signal_status.message %}
+      <p style="color: #c00;">{{ signal_status.message }}</p>
     {% endif %}
-  </div>
-  <div class="card">
-    <h2>Strategy 0.10</h2>
-    {% if summary.strategy_0_10 %}
-      <p><strong>Trades:</strong> {{ summary.strategy_0_10.num_trades }}</p>
-      <p><strong>Win rate:</strong> {{ "%.2f"|format(summary.strategy_0_10.win_rate * 100) }}%</p>
-      <p><strong>Avg profit:</strong> {{ "%.4f"|format(summary.strategy_0_10.average_profit) }}</p>
-      <p><strong>Total profit:</strong> {{ "%.4f"|format(summary.strategy_0_10.total_profit) }}</p>
-    {% else %}
-      <p>No data yet. Run the scheduler once to populate results.</p>
-    {% endif %}
-  </div>
+  {% else %}
+    <p>No signal data yet.</p>
+  {% endif %}
 </section>
 
 <section class="card" style="margin-top: 1rem;">

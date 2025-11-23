@@ -143,6 +143,48 @@ def list_signals(limit: int = 100) -> List[Dict[str, Any]]:
     return get_recent_signals(limit=limit)
 
 
+def get_signal_status_summary() -> Dict[str, Any]:
+    """Return counts by status and the latest signal timestamp."""
+
+    conn = get_connection()
+    counts: Dict[str, int] = {}
+    latest_ts = None
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            """
+            SELECT status, count(*)
+            FROM signals
+            GROUP BY status
+            """
+        )
+        for status, cnt in cur.fetchall():
+            counts[str(status)] = int(cnt)
+
+        cur.execute("SELECT max(created_at) FROM signals")
+        row = cur.fetchone()
+        if row and row[0]:
+            latest_ts = row[0]
+    finally:
+        conn.close()
+
+    open_count = sum(
+        counts.get(s, 0) for s in ("pending", "resting", "sent", "simulated")
+    )
+    message = ""
+    if open_count == 0:
+        if latest_ts:
+            message = f"No open signals. Last signal at {latest_ts.isoformat()}"
+        else:
+            message = "No signals have been generated yet."
+
+    return {
+        "counts": counts,
+        "latest_created_at": latest_ts.isoformat() if latest_ts else None,
+        "message": message,
+    }
+
+
 @app.get("/positions")
 def list_positions() -> List[Dict[str, Any]]:
     conn = get_connection()
@@ -284,31 +326,18 @@ def exposure() -> Dict[str, float]:
 @app.get("/")
 def dashboard(request: Request) -> Any:
     latest = get_all_latest_backtest_results()
-    strategy_0_90 = (
-        latest.get("strategy_0_90")
-        or latest.get("threshold_yes_0.90")
-        or latest.get("threshold_yes_0.9")
-    )
-    strategy_0_10 = (
-        latest.get("strategy_0_10")
-        or latest.get("threshold_no_0.10")
-        or latest.get("threshold_no_0.1")
-    )
     thresholds = {k: v for k, v in latest.items() if k.startswith("threshold_")}
     return templates.TemplateResponse(
         "dashboard.html",
         {
             "request": request,
-            "summary": {
-                "strategy_0_90": strategy_0_90,
-                "strategy_0_10": strategy_0_10,
-            },
             "thresholds": thresholds,
             "signals": get_recent_signals(limit=50),
             "positions": list_positions(),
             "trades": list_trades(limit=50),
             "pnl_series": list_daily_pnl(limit=90),
             "exposure": get_current_exposure(),
+            "signal_status": get_signal_status_summary(),
         },
     )
 
