@@ -21,7 +21,7 @@ COLLEGE_CATEGORIES = {"college", "ncaa", "ncaaf", "ncaab"}
 COLLEGE_MIN_REMAINING = timedelta(hours=1)
 PRO_INPLAY_BAND_LOW = 0.88
 PRO_INPLAY_BAND_HIGH = 0.92
-PRO_INPLAY_MAX_REMAINING = timedelta(hours=6)
+SPORTS_INPLAY_MAX_REMAINING = timedelta(minutes=30)
 
 
 def _build_probability_lookup() -> Callable[[float], float]:
@@ -133,10 +133,18 @@ def generate_signals(ev_threshold: float = EV_THRESHOLD_DEFAULT, max_signals: in
                 and float(p_mkt) <= COLLEGE_LONGSHOT_THRESHOLD
                 and (exp_ts - now) >= COLLEGE_MIN_REMAINING
             )
-            pro_inplay_band = (
+            cat_lower = (cat or "").lower()
+            is_sport_any = (
                 is_pro_sport
+                or is_college
+                or ("sport" in cat_lower)
+            )
+            remaining = exp_ts - now
+            pro_inplay_band = (
+                is_sport_any
                 and PRO_INPLAY_BAND_LOW <= float(p_mkt) <= PRO_INPLAY_BAND_HIGH
-                and (exp_ts - now) <= PRO_INPLAY_MAX_REMAINING
+                and remaining <= SPORTS_INPLAY_MAX_REMAINING
+                and remaining > timedelta(0)
             )
 
             candidates: List[Tuple[str, float, bool]] = []
