@@ -217,8 +217,9 @@ def get_current_exposure() -> Dict[str, float]:
         )
         now = datetime.now(timezone.utc)
         for side, avg_price, size, expiration_ts in cur.fetchall():
-            if expiration_ts and expiration_ts < now:
-                continue  # ignore expired markets
+            # Ignore positions with no known future expiry to avoid stale rows.
+            if not expiration_ts or expiration_ts < now:
+                continue
             pos_risk += _risk(side, avg_price, size)
 
         cur.execute(

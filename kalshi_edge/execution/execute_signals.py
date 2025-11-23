@@ -105,8 +105,9 @@ def compute_existing_risk(conn) -> Dict[str, Any]:
         )
         now = datetime.now(timezone.utc)
         for market_ticker, side, size, avg_price, expiration_ts in cur.fetchall():
-            if expiration_ts and expiration_ts < now:
-                continue  # ignore expired positions
+            # Ignore positions without a valid future expiry; avoids stale rows.
+            if not expiration_ts or expiration_ts < now:
+                continue
             avg_price = _norm_price(avg_price)
             if side == "yes":
                 r = abs(avg_price * size)
