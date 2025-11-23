@@ -83,6 +83,49 @@ class KalshiSDKClient:
             cursor = payload.get("cursor")
             if not cursor:
                 break
+
+    def iter_events_allow_invalid(
+        self, category: Optional[str] = None, limit: int = 500
+    ) -> Iterable[dict]:
+        """Yield events via raw HTTP to tolerate enum drift."""
+
+        cursor: Optional[str] = None
+        while True:
+            params = {"limit": limit, "cursor": cursor, "category": category}
+            query = urlencode({k: v for k, v in params.items() if v is not None})
+            url = f"{self.api_client.configuration.host}/events?{query}"
+            raw = self.api_client.call_api(
+                method="GET",
+                url=url,
+                header_params=dict(self.api_client.default_headers),
+                _request_timeout=self.request_timeout,
+            )
+            body = raw.data or raw.read()
+            if not body:
+                raise RuntimeError(f"Empty response from {url} (status={raw.status})")
+            payload = json.loads(body.decode("utf-8"))
+            events = payload.get("events") or []
+            LOGGER.info("Fetched %d events (category=%s, cursor=%s)", len(events), category, cursor)
+            for event in events:
+                yield event
+            cursor = payload.get("cursor")
+            if not cursor:
+                break
+
+    def get_event_allow_invalid(self, event_ticker: str) -> dict:
+        """Fetch a single event, tolerating enum drift."""
+
+        url = f"{self.api_client.configuration.host}/events/{event_ticker}"
+        raw = self.api_client.call_api(
+            method="GET",
+            url=url,
+            header_params=dict(self.api_client.default_headers),
+            _request_timeout=self.request_timeout,
+        )
+        body = raw.data or raw.read()
+        if not body:
+            raise RuntimeError(f"Empty response from {url} (status={raw.status})")
+        return json.loads(body.decode("utf-8"))
     def _normalize_interval(self, interval: str | int) -> str:
         """Normalize interval formats ('1h', '5m', 60) into minute strings expected by API."""
         if isinstance(interval, (int, float)):

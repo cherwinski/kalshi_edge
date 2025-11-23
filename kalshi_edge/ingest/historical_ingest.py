@@ -247,6 +247,7 @@ def ingest_recent(
     status: str = "open",
     limit_markets: Optional[int] = None,
     expire_within_hours: Optional[int] = 24,
+    include_events: bool = True,
 ) -> None:
     """Incremental ingest using Kalshi candlesticks for the last N hours."""
 
@@ -286,6 +287,35 @@ def ingest_recent(
                 for mid in target_ids
                 if (exp_map.get(mid) is not None) and (exp_map.get(mid) <= upper)
             ]
+
+        # Optionally pull event-driven markets (e.g., football) and add them to target_ids.
+        if include_events and expire_within_hours is not None:
+            upper = now + timedelta(hours=expire_within_hours)
+            for event in client.iter_events_allow_invalid(category="football"):
+                event_ticker = event.get("event_ticker") or event.get("ticker")
+                exp = event.get("close_time") or event.get("expiration_time")
+                exp_dt = None
+                if exp:
+                    try:
+                        exp_dt = datetime.fromisoformat(exp.replace("Z", "+00:00"))
+                    except Exception:
+                        exp_dt = None
+                if exp_dt and exp_dt > upper:
+                    continue
+                if not event_ticker:
+                    continue
+                try:
+                    detail = client.get_event_allow_invalid(event_ticker)
+                except Exception as exc:
+                    LOGGER.warning("Failed to fetch event %s: %s", event_ticker, exc)
+                    continue
+                for mk in detail.get("markets") or []:
+                    normalized = normalize_market(mk)
+                    if not normalized["market_id"]:
+                        continue
+                    upsert_market(cursor, normalized)
+                    series_lookup[normalized["market_id"]] = normalized.get("series_ticker")
+                    target_ids.append(normalized["market_id"])
         for market_id in target_ids:
             normalized_market = {
                 "market_id": market_id,
