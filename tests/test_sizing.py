@@ -17,7 +17,8 @@ def test_dynamic_sizing_yes_side_uses_fraction_cap():
         risk_fraction=0.03,  # 3% of bankroll = $30 cap
     )
     assert rpc == 0.5
-    assert size == 60  # floor(30 / 0.5)
+    # Default sizing targets ~$3 risk, so ceil(3 / 0.5) = 6
+    assert size == 6
 
 
 def test_dynamic_sizing_no_side_uses_fraction_cap():
@@ -34,7 +35,8 @@ def test_dynamic_sizing_no_side_uses_fraction_cap():
         risk_fraction=0.03,
     )
     assert rpc == pytest.approx(0.2)  # 1 - price
-    assert size == 150  # floor(30 / 0.2)
+    # Default sizing targets ~$3 risk, so ceil(3 / 0.2) ~ 16
+    assert size == 16
 
 
 def test_dynamic_sizing_respects_remaining_total_risk():

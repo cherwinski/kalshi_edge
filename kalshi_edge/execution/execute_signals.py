@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from typing import Any, Dict, List, Mapping
+import math
 
 from kalshi_edge.config import (
     get_execution_mode,
@@ -126,7 +127,12 @@ def compute_order_size_for_signal(
     if max_risk <= 0:
         return 0, risk_per_contract
 
-    size = int(max_risk // risk_per_contract)
+    # Default target risk is ~$3 per order unless caps force lower.
+    target_risk = min(3.0, max_risk)
+    size = int(math.ceil(target_risk / risk_per_contract))
+    # Ensure we don't exceed max_risk
+    if size * risk_per_contract > max_risk:
+        size = int(max_risk // risk_per_contract)
     if size <= 0:
         return 0, risk_per_contract
 
