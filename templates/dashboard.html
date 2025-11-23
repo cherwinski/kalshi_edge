@@ -26,6 +26,17 @@
 </section>
 
 <section class="card" style="margin-top: 1rem;">
+  <h2>Risk In Play</h2>
+  {% if exposure %}
+    <p><strong>Total exposure:</strong> ${{ "%.2f"|format(exposure.total_exposure or 0) }}</p>
+    <p><strong>Open positions:</strong> ${{ "%.2f"|format(exposure.positions_exposure or 0) }}</p>
+    <p><strong>Open signals:</strong> ${{ "%.2f"|format(exposure.signals_exposure or 0) }}</p>
+  {% else %}
+    <p>No exposure data available.</p>
+  {% endif %}
+</section>
+
+<section class="card" style="margin-top: 1rem;">
   <h2>Threshold Performance</h2>
   {% if thresholds %}
   <table style="width: 100%; border-collapse: collapse;">

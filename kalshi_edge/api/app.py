@@ -179,6 +179,55 @@ def list_trades(limit: int = 100) -> List[Dict[str, Any]]:
     return [dict(zip(keys, row)) for row in rows]
 
 
+def get_current_exposure() -> Dict[str, float]:
+    """Estimate current risk in play from positions and open signals."""
+
+    def _risk(side: str, price: float, size: int) -> float:
+        side = (side or "").lower()
+        try:
+            price_f = float(price or 0.0)
+        except Exception:
+            price_f = 0.0
+        size_i = abs(int(size or 0))
+        if size_i <= 0:
+            return 0.0
+        return (1.0 - price_f) * size_i if side == "no" else price_f * size_i
+
+    pos_risk = 0.0
+    sig_risk = 0.0
+
+    conn = get_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT side, avg_entry_price, size FROM positions")
+        for side, avg_price, size in cur.fetchall():
+            pos_risk += _risk(side, avg_price, size)
+
+        cur.execute(
+            """
+            SELECT side, p_mkt, size
+            FROM signals
+            WHERE status IN ('pending', 'sent', 'resting', 'simulated')
+            """
+        )
+        for side, p_mkt, size in cur.fetchall():
+            sig_risk += _risk(side, p_mkt, size)
+    finally:
+        conn.close()
+
+    total = pos_risk + sig_risk
+    return {
+        "total_exposure": total,
+        "positions_exposure": pos_risk,
+        "signals_exposure": sig_risk,
+    }
+
+
+@app.get("/exposure")
+def exposure() -> Dict[str, float]:
+    return get_current_exposure()
+
+
 @app.get("/")
 def dashboard(request: Request) -> Any:
     latest = get_all_latest_backtest_results()
@@ -206,6 +255,7 @@ def dashboard(request: Request) -> Any:
             "positions": list_positions(),
             "trades": list_trades(limit=50),
             "pnl_series": list_daily_pnl(limit=90),
+            "exposure": get_current_exposure(),
         },
     )
 
