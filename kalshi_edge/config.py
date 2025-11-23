@@ -128,9 +128,10 @@ def get_max_risk_fraction_per_trade() -> float:
     """Maximum fraction of bankroll to risk on a single trade (e.g., 0.03 = 3%)."""
 
     try:
-        return float(os.getenv("MAX_RISK_FRACTION_PER_TRADE", "0.03"))
+        # Default to a conservative 1.5% until we have better signal confidence.
+        return float(os.getenv("MAX_RISK_FRACTION_PER_TRADE", "0.015"))
     except ValueError:
-        return 0.03
+        return 0.015
 
 
 def get_take_profit_factor() -> float:
