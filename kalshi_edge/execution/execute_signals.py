@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List
 
-from kalshi_edge.config import get_execution_mode, get_risk_limits
+from kalshi_edge.config import get_execution_mode, get_risk_limits, get_kalshi_env
 from kalshi_edge.db import get_connection
 from kalshi_edge.execution.client import ExecutionClient, OrderRequest
 from kalshi_edge.util.logging import get_logger
@@ -120,12 +120,20 @@ def update_signal_execution(
 
 def execute_signals(batch_limit: int = 50) -> int:
     mode = get_execution_mode()
+    env = get_kalshi_env()
     limits = get_risk_limits()
     signals = fetch_pending_signals(limit=batch_limit)
     if not signals:
         return 0
 
-    client = ExecutionClient() if mode == "live" else None
+    client = None
+    if mode == "live":
+        try:
+            client = ExecutionClient()
+            LOGGER.warning("Execution running in LIVE mode against %s", env)
+        except Exception as exc:
+            LOGGER.exception("Failed to initialize ExecutionClient; falling back to simulate. %s", exc)
+            mode = "simulate"
 
     conn = get_connection()
     try:
@@ -180,19 +188,29 @@ def execute_signals(batch_limit: int = 50) -> int:
             )
         else:
             try:
+                limit_price = float(sig["p_mkt"])
                 order_req = OrderRequest(
                     market_ticker=market_ticker,
                     side=sig["side"],
                     size=int(sig["size"]),
-                    price=None,  # TODO: map to limit price if desired
+                    price=limit_price,
+                )
+                if client is None:
+                    raise RuntimeError("Execution client not initialized; cannot send live orders")
+                order_req = OrderRequest(
+                    market_ticker=market_ticker,
+                    side=sig["side"],
+                    size=int(sig["size"]),
+                    price=limit_price,
                 )
                 resp = client.place_order(order_req)  # type: ignore[arg-type]
                 order_id = str(resp.get("order_id") or resp.get("id") or "")
-                executed_price = float(sig["p_mkt"])
-                executed_size = int(sig["size"])
+                executed_price = float(resp.get("avg_price") or limit_price)
+                executed_size = int(resp.get("filled_size") or sig["size"])
+                status = resp.get("status") or "sent"
                 update_signal_execution(
                     sig_id,
-                    status="sent",
+                    status=status,
                     execution_mode=mode,
                     order_id=order_id,
                     executed_price=executed_price,

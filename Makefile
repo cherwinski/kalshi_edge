@@ -47,6 +47,9 @@ signals:
 execute-signals:
 	poetry run python -m kalshi_edge.execution.execute_signals
 
+test-live-order:
+	poetry run python scripts/test_live_order.py
+
 dev:
 	@echo "Start scheduler and API in separate terminals:"
 	@echo "  Terminal 1 -> make run-scheduler"
