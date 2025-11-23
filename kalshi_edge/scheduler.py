@@ -142,7 +142,7 @@ def _safe_job(job: Callable[..., Any], *args: Any, **kwargs: Any) -> None:
 
 def main() -> None:
     LOGGER.info("Starting kalshi_edge scheduler")
-    schedule.every(5).minutes.do(_safe_job, ingest_recent_data)
+    schedule.every(1).minutes.do(_safe_job, ingest_recent_data)
     schedule.every().day.at("02:00").do(_safe_job, run_all_backtests)
 
     while True:
