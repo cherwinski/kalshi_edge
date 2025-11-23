@@ -39,6 +39,12 @@ def _parse_dt(value: Any) -> Optional[datetime]:
         try:
             return datetime.fromisoformat(value)
         except ValueError:
+            # Handle trailing Z (Zulu) timestamps
+            if value.endswith("Z"):
+                try:
+                    return datetime.fromisoformat(value.replace("Z", "+00:00"))
+                except ValueError:
+                    return None
             return None
     return None
 
