@@ -126,44 +126,17 @@ def generate_signals(ev_threshold: float = EV_THRESHOLD_DEFAULT, max_signals: in
                 continue
             bucket = _expiry_bucket(exp_ts)
 
-            is_pro_sport = (cat or "").lower() in PRO_SPORTS_CATEGORIES
-            longshot_yes = is_pro_sport and float(p_mkt) <= PRO_SPORTS_LONGSHOT_THRESHOLD
-            is_college = (cat or "").lower() in COLLEGE_CATEGORIES
-            longshot_college = (
-                is_college
-                and float(p_mkt) <= COLLEGE_LONGSHOT_THRESHOLD
-                and (exp_ts - now) >= COLLEGE_MIN_REMAINING
-            )
-            cat_lower = (cat or "").lower()
-            ticker_upper = market_id.upper()
-            is_sport_any = (
-                is_pro_sport
-                or is_college
-                or ("sport" in cat_lower)
-                or any(hint in ticker_upper for hint in SPORT_TICKER_HINTS)
-            )
-            remaining = exp_ts - now
-            pro_inplay_band = (
-                is_sport_any
-                and PRO_INPLAY_BAND_LOW <= float(p_mkt) <= PRO_INPLAY_BAND_HIGH
-                and remaining <= SPORTS_INPLAY_MAX_REMAINING
-                and remaining > timedelta(0)
-            )
+            # Enforce high-probability band (88-92%) unless explicitly overridden.
+            price = float(p_mkt)
+            if price < PRO_INPLAY_BAND_LOW or price > PRO_INPLAY_BAND_HIGH:
+                LOGGER.debug("Skipping %s due to price band constraint (p=%.3f)", market_id, price)
+                continue
 
             candidates: List[Tuple[str, float, bool]] = []
             if ev_yes >= ev_threshold:
                 candidates.append(("yes", ev_yes, False))
             if ev_no >= ev_threshold:
                 candidates.append(("no", ev_no, False))
-            # Pro sports long-shot rule: take YES if price <= 15% within 24h window regardless of EV.
-            if longshot_yes:
-                candidates.append(("yes", ev_yes, True))
-            # College sports long-shot rule: take YES at <=2% within 24h.
-            if longshot_college:
-                candidates.append(("yes", ev_yes, True))
-            # Pro sports in-play band: grab high-probability edges between 88-92% in late stages (<=6h remaining).
-            if pro_inplay_band:
-                candidates.append(("yes", ev_yes, True))
 
             for side, ev, forced in candidates:
                 cursor.execute(
