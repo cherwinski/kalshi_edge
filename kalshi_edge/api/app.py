@@ -92,7 +92,18 @@ def get_recent_signals(limit: int = 100) -> List[Dict[str, Any]]:
                    p_mkt, p_true_est, expected_value, size, status,
                    execution_mode, order_id, executed_price, executed_size, last_error
             FROM signals
-            ORDER BY created_at DESC
+            ORDER BY
+              CASE
+                WHEN status = 'pending' THEN 0
+                WHEN status = 'resting' THEN 1
+                WHEN status = 'sent' THEN 2
+                WHEN status = 'simulated' THEN 3
+                WHEN status = 'executed' THEN 4
+                WHEN status = 'ignored' THEN 5
+                WHEN status = 'error' THEN 6
+                ELSE 7
+              END,
+              created_at DESC
             LIMIT %s
             """,
             (limit,),
