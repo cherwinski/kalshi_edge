@@ -24,6 +24,14 @@ Kalshi Bot
 - `snapshot_account_pnl` computes realized/unrealized PnL from positions + latest marks into `account_pnl` (equity curve).
 - Dashboard shows positions, recent trades, signals, and an equity chart; calibration panel now shows sample count.
 
+## Dynamic sizing & bankroll risk
+
+- Configure bankroll: `INITIAL_BANKROLL_USD` (default 1000) and `MAX_RISK_FRACTION_PER_TRADE` (default 0.03 = 3%).
+- Current bankroll uses the latest `account_pnl.total_equity` if available; otherwise falls back to `INITIAL_BANKROLL_USD`.
+- Per-trade size is derived from `risk_per_contract` (price for YES, 1-price for NO) and capped by:
+  - `MIN(per_trade_cap, market cap, total cap)` where `per_trade_cap = MIN(MAX_RISK_PER_TRADE_USD, MAX_RISK_FRACTION_PER_TRADE * bankroll)`.
+- If the computed size is 0, the signal is ignored with a budget warning.
+
 ## Make targets / helpers
 
 - `make sync-positions` – pull portfolio positions from Kalshi into DB.

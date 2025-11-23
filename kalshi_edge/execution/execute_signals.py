@@ -1,15 +1,22 @@
 """Consume pending signals, enforce risk limits, and simulate or send orders."""
 from __future__ import annotations
 
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Mapping
 
-from kalshi_edge.config import get_execution_mode, get_risk_limits, get_kalshi_env
+from kalshi_edge.config import (
+    get_execution_mode,
+    get_risk_limits,
+    get_kalshi_env,
+    get_current_bankroll_usd,
+    get_max_risk_fraction_per_trade,
+)
 from kalshi_edge.db import get_connection
 from kalshi_edge.execution.client import ExecutionClient, OrderRequest
 from kalshi_edge.util.logging import get_logger
 from kalshi_edge.portfolio.pnl import record_trade
 
 LOGGER = get_logger(__name__)
+MAX_CONTRACTS_CAP = 1000  # hard safety cap on contract count per order
 
 
 def fetch_pending_signals(limit: int = 50) -> List[Dict[str, Any]]:
@@ -74,16 +81,57 @@ def compute_existing_risk(conn) -> Dict[str, Any]:
         per_market[market_ticker] = per_market.get(market_ticker, 0.0) + r
         total += r
 
-    # include open positions risk
-    cur.execute("SELECT market_ticker, side, size, avg_entry_price FROM positions")
-    for market_ticker, side, size, avg_price in cur.fetchall():
-        if side == "yes":
-            r = abs(avg_price * size)
-        else:
-            r = abs((1.0 - avg_price) * size)
-        per_market[market_ticker] = per_market.get(market_ticker, 0.0) + r
-        total += r
+    # include open positions risk (best-effort; table may be absent)
+    try:
+        cur.execute("SELECT market_ticker, side, size, avg_entry_price FROM positions")
+        for market_ticker, side, size, avg_price in cur.fetchall():
+            if side == "yes":
+                r = abs(avg_price * size)
+            else:
+                r = abs((1.0 - avg_price) * size)
+            per_market[market_ticker] = per_market.get(market_ticker, 0.0) + r
+            total += r
+    except Exception:
+        pass
     return {"total": total, "per_market": per_market}
+
+
+def compute_order_size_for_signal(
+    signal: Mapping[str, Any],
+    bankroll: float,
+    risk_limits: Mapping[str, float],
+    *,
+    per_market_risk: float = 0.0,
+    total_risk: float = 0.0,
+    risk_fraction: float | None = None,
+) -> tuple[int, float]:
+    """Return (size, risk_per_contract) using bankroll-aware sizing."""
+
+    side = (signal.get("side") or "").lower()
+    price = float(signal.get("p_mkt") or 0.0)
+    if side == "no":
+        risk_per_contract = 1.0 - price
+    else:
+        risk_per_contract = price
+
+    if risk_per_contract <= 0:
+        return 0, risk_per_contract
+
+    fraction = risk_fraction if risk_fraction is not None else get_max_risk_fraction_per_trade()
+    per_trade_cap = min(risk_limits["max_risk_per_trade"], bankroll * fraction)
+    remaining_market = risk_limits["max_risk_per_market"] - per_market_risk
+    remaining_total = risk_limits["max_risk_total"] - total_risk
+    max_risk = min(per_trade_cap, remaining_market, remaining_total)
+
+    if max_risk <= 0:
+        return 0, risk_per_contract
+
+    size = int(max_risk // risk_per_contract)
+    if size <= 0:
+        return 0, risk_per_contract
+
+    size = min(size, MAX_CONTRACTS_CAP)
+    return size, risk_per_contract
 
 
 def update_signal_execution(
@@ -151,6 +199,7 @@ def execute_signals(batch_limit: int = 50) -> int:
         risk_state = compute_existing_risk(conn)
         total_risk = risk_state["total"]
         per_market = risk_state["per_market"]
+        bankroll = get_current_bankroll_usd(conn)
     finally:
         conn.close()
 
@@ -160,7 +209,26 @@ def execute_signals(batch_limit: int = 50) -> int:
         sig_id = sig["id"]
         market_ticker = sig["market_ticker"]
         trade_direction = "buy"  # buy YES or buy NO; selling paths can be added later.
-        risk_new = estimate_trade_risk_usd(sig)
+
+        current_market_risk = per_market.get(market_ticker, 0.0)
+        size, risk_per_contract = compute_order_size_for_signal(
+            sig,
+            bankroll,
+            limits,
+            per_market_risk=current_market_risk,
+            total_risk=total_risk,
+        )
+
+        if size <= 0:
+            update_signal_execution(
+                sig_id,
+                status="ignored",
+                execution_mode=mode,
+                error="Insufficient risk budget for dynamic sizing",
+            )
+            continue
+
+        risk_new = risk_per_contract * size
 
         if risk_new > limits["max_risk_per_trade"]:
             update_signal_execution(
@@ -196,14 +264,14 @@ def execute_signals(batch_limit: int = 50) -> int:
                 status="simulated",
                 execution_mode=mode,
                 executed_price=float(sig["p_mkt"]),
-                executed_size=int(sig["size"]),
+                executed_size=size,
             )
             record_trade(
                 {
                     "signal_id": sig_id,
                     "market_ticker": market_ticker,
                     "side": sig["side"],
-                    "size": int(sig["size"]),
+                    "size": size,
                     "price": float(sig["p_mkt"]),
                     "direction": trade_direction,
                 }
@@ -214,7 +282,7 @@ def execute_signals(batch_limit: int = 50) -> int:
                 order_req = OrderRequest(
                     market_ticker=market_ticker,
                     side=sig["side"],
-                    size=int(sig["size"]),
+                    size=size,
                     price=limit_price,
                     direction=trade_direction,
                 )
@@ -223,7 +291,7 @@ def execute_signals(batch_limit: int = 50) -> int:
                 resp = client.place_order(order_req)  # type: ignore[arg-type]
                 order_id = str(resp.get("order_id") or resp.get("id") or "")
                 executed_price = float(resp.get("avg_price") or limit_price)
-                executed_size = int(resp.get("filled_size") or sig["size"])
+                executed_size = int(resp.get("filled_size") or size)
                 status = resp.get("status") or "sent"
                 update_signal_execution(
                     sig_id,

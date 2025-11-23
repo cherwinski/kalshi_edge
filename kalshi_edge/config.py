@@ -115,6 +115,45 @@ def get_risk_limits() -> dict:
     }
 
 
+def get_initial_bankroll_usd() -> float:
+    """Configured starting capital used when no account snapshot is available."""
+
+    try:
+        return float(os.getenv("INITIAL_BANKROLL_USD", "1000.0"))
+    except ValueError:
+        return 1000.0
+
+
+def get_max_risk_fraction_per_trade() -> float:
+    """Maximum fraction of bankroll to risk on a single trade (e.g., 0.03 = 3%)."""
+
+    try:
+        return float(os.getenv("MAX_RISK_FRACTION_PER_TRADE", "0.03"))
+    except ValueError:
+        return 0.03
+
+
+def get_current_bankroll_usd(conn) -> float:
+    """
+    Return current bankroll/equity.
+    - If account_pnl exists and has rows, use the latest total_equity.
+    - Otherwise, fall back to INITIAL_BANKROLL_USD.
+    """
+
+    initial = get_initial_bankroll_usd()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT total_equity FROM account_pnl ORDER BY as_of_date DESC LIMIT 1;"
+            )
+            row = cur.fetchone()
+        if row is None:
+            return initial
+        return float(row[0])
+    except Exception:
+        return initial
+
+
 __all__ = [
     "Environment",
     "Settings",
@@ -124,4 +163,7 @@ __all__ = [
     "get_kalshi_creds",
     "get_execution_mode",
     "get_risk_limits",
+    "get_initial_bankroll_usd",
+    "get_max_risk_fraction_per_trade",
+    "get_current_bankroll_usd",
 ]
