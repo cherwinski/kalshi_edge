@@ -252,7 +252,7 @@ def ingest_recent(
 
     with connection_ctx() as conn, conn.cursor() as cursor:
         for idx, market in enumerate(client.iter_markets_allow_invalid(status=status)):
-            if limit_markets is not None and idx >= limit_markets:
+            if limit_markets is not None and limit_markets > 0 and idx >= limit_markets:
                 LOGGER.info("Stopping after %d markets due to limit", limit_markets)
                 break
             normalized = normalize_market(market)
