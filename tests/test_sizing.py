@@ -1,3 +1,5 @@
+import pytest
+
 from kalshi_edge.execution.execute_signals import compute_order_size_for_signal
 
 
@@ -31,7 +33,7 @@ def test_dynamic_sizing_no_side_uses_fraction_cap():
         risk_limits=risk_limits,
         risk_fraction=0.03,
     )
-    assert rpc == 0.2  # 1 - price
+    assert rpc == pytest.approx(0.2)  # 1 - price
     assert size == 150  # floor(30 / 0.2)
 
 

@@ -1,6 +1,14 @@
-"""Backtest the "buy at 0.90 YES" strategy."""
 from __future__ import annotations
 
+# pytest monkeypatch compatibility: expose a connection_ctx symbol
+try:
+    from kalshi_edge.db import connection_ctx as _connection_ctx
+except Exception:  # pragma: no cover - tests will monkeypatch
+    _connection_ctx = None  # type: ignore[assignment]
+
+connection_ctx = _connection_ctx
+
+"""Backtest the "buy at 0.90 YES" strategy."""
 import argparse
 import csv
 from pathlib import Path
@@ -8,6 +16,7 @@ from typing import Any, Dict, List, Tuple
 
 from ..util.logging import get_logger
 from .strategy_threshold import run_threshold_backtest
+from . import strategy_threshold as _threshold_mod
 
 LOGGER = get_logger(__name__)
 DEFAULT_THRESHOLD = 0.90
@@ -15,6 +24,8 @@ OUT_DIR = Path("out")
 
 
 def run_backtest(threshold: float = DEFAULT_THRESHOLD) -> Tuple[Dict[str, Any], List[Dict[str, Any]]]:
+    # Ensure threshold engine uses our (monkeypatchable) connection_ctx during tests.
+    _threshold_mod.connection_ctx = connection_ctx  # type: ignore[attr-defined]
     return run_threshold_backtest(threshold=threshold, direction="yes")
 
 
