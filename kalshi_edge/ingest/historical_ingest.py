@@ -156,6 +156,45 @@ def _ingest_market_candles(
     return inserted
 
 
+def _insert_quote_snapshot(cursor, client: KalshiSDKClient, market_id: str) -> int:
+    """Fallback when candlesticks are unavailable: insert a single quote snapshot."""
+
+    try:
+        quote = client.markets_api.get_market(market_ticker=market_id)
+    except Exception as exc:  # pragma: no cover - defensive fallback
+        LOGGER.warning("Snapshot fetch failed for %s: %s", market_id, exc)
+        return 0
+
+    market = getattr(quote, "market", quote)
+
+    def _get(obj: Any, name: str) -> Any:
+        return getattr(obj, name, None) if hasattr(obj, name) else obj.get(name) if isinstance(obj, dict) else None
+
+    bid = _get(market, "best_bid_yes")
+    ask = _get(market, "best_ask_yes")
+    last = _get(market, "last_price") or _get(market, "last_yes")
+    mid = None
+    if bid is not None and ask is not None:
+        mid = (float(bid) + float(ask)) / 2.0
+    elif last is not None:
+        mid = float(last) if float(last) <= 1 else float(last) / 100.0
+
+    if mid is None:
+        LOGGER.warning("No quote data available for %s; skipping snapshot", market_id)
+        return 0
+
+    row = {
+        "market_id": market_id,
+        "timestamp": datetime.now(timezone.utc),
+        "last_yes": mid,
+        "bid_yes": float(bid) if bid is not None else None,
+        "ask_yes": float(ask) if ask is not None else None,
+        "volume": _get(market, "volume"),
+        "open_interest": _get(market, "open_interest"),
+    }
+    return 1 if insert_price(cursor, row) else 0
+
+
 def backfill_full_history(
     status: str = "settled",
     max_markets: int | None = None,
@@ -239,7 +278,10 @@ def ingest_recent(
                 if inserted:
                     LOGGER.info("Inserted %d recent prices for %s", inserted, market_id)
             except NotFoundException:
-                LOGGER.warning("Skipping market %s: candlesticks not found", market_id)
+                LOGGER.warning("Candlesticks not found for %s; inserting snapshot instead", market_id)
+                snap = _insert_quote_snapshot(cursor, client, market_id)
+                if snap:
+                    LOGGER.info("Inserted %d snapshot price for %s", snap, market_id)
                 continue
         conn.commit()
 
