@@ -13,6 +13,7 @@ from ..util.logging import get_logger
 LOGGER = get_logger(__name__)
 EV_THRESHOLD_DEFAULT = 0.02
 MAX_SIGNALS_DEFAULT = 100
+EXPIRY_HARD_LIMIT_HOURS = 24
 
 
 def _build_probability_lookup() -> Callable[[float], float]:
@@ -87,6 +88,8 @@ def generate_signals(ev_threshold: float = EV_THRESHOLD_DEFAULT, max_signals: in
 
     p_true_fn = _build_probability_lookup()
     created = 0
+    now = datetime.now(timezone.utc)
+    hard_cutoff = now + timedelta(hours=EXPIRY_HARD_LIMIT_HOURS)
 
     with get_connection() as conn, conn.cursor(cursor_factory=RealDictCursor) as cursor:
         prices = _latest_prices(cursor)
@@ -107,6 +110,11 @@ def generate_signals(ev_threshold: float = EV_THRESHOLD_DEFAULT, max_signals: in
             info = meta.get(market_id, {})
             cat = info.get("category")
             exp_ts = info.get("expiration_ts")
+            # Hard 24h expiry rule: skip anything without an expiry, already expired,
+            # or beyond the cutoff window.
+            if not exp_ts or exp_ts < now or exp_ts > hard_cutoff:
+                LOGGER.debug("Skipping %s due to expiry outside 24h window (exp_ts=%s)", market_id, exp_ts)
+                continue
             bucket = _expiry_bucket(exp_ts)
 
             candidates: List[Tuple[str, float]] = []
