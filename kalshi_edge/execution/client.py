@@ -65,7 +65,8 @@ class ExecutionClient:
             req_kwargs["no_price"] = price_cents
 
         create_req = CreateOrderRequest(**req_kwargs)
-        resp = self.portfolio_api.create_order(create_order_request=create_req)
+        # Pass model directly to avoid nesting {"create_order_request": {...}} in the payload.
+        resp = self.portfolio_api.create_order(create_req)
         order_obj = resp.order if hasattr(resp, "order") else None
 
         avg_price_raw = (
