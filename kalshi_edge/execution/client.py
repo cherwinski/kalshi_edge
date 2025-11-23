@@ -65,9 +65,15 @@ class ExecutionClient:
             req_kwargs["no_price"] = price_cents
 
         create_req = CreateOrderRequest(**req_kwargs)
-        # Pass model directly to avoid nesting {"create_order_request": {...}} in the payload.
-        resp = self.portfolio_api.create_order(create_req)
-        order_obj = resp.order if hasattr(resp, "order") else None
+        # Manually call the API to avoid nesting the body under "create_order_request".
+        resp, _, _ = self.api_client.call_api(
+            "/portfolio/orders",
+            "POST",
+            body=create_req.to_dict(),
+            response_type=None,
+            _check_return_type=False,
+        )
+        order_obj = resp.get("order") if isinstance(resp, dict) else None
 
         avg_price_raw = (
             getattr(order_obj, "yes_price", None) if side == "yes" else getattr(order_obj, "no_price", None)
