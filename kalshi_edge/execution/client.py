@@ -51,11 +51,12 @@ class ExecutionClient:
         if order.price is not None:
             price_cents = max(1, min(99, int(round(order.price * 100))))
 
+        # API expects lowercase enum values for side/action/type.
         req_kwargs: Dict[str, Any] = {
             "ticker": order.market_ticker,
-            "side": side.upper(),
-            "action": direction.upper(),
-            "type": "LIMIT",
+            "side": side,
+            "action": direction,
+            "type": "limit",
             "count": int(order.size),
         }
         if side == "yes":
