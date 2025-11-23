@@ -147,7 +147,13 @@ def list_daily_pnl(limit: int = 90) -> List[Dict[str, Any]]:
     finally:
         conn.close()
     keys = ["as_of_date", "realized_pnl", "unrealized_pnl", "total_equity"]
-    return [dict(zip(keys, row)) for row in rows][::-1]
+    formatted: List[Dict[str, Any]] = []
+    for row in rows:
+        item = dict(zip(keys, row))
+        if item.get("as_of_date") is not None:
+            item["as_of_date"] = item["as_of_date"].isoformat()
+        formatted.append(item)
+    return formatted[::-1]
 
 
 @app.get("/pnl/trades")
