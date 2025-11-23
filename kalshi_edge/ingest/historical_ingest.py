@@ -6,6 +6,8 @@ import os
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, Iterable, List, Optional, Sequence
 
+from kalshi_python.exceptions import NotFoundException
+
 from ..db import connection_ctx
 from ..util.logging import get_logger
 from .kalshi_sdk_client import KalshiSDKClient
@@ -226,15 +228,19 @@ def ingest_recent(
                 "series_ticker": series_lookup.get(market_id)
                 or (market_id.split(".")[0] if "." in market_id else market_id),
             }
-            inserted = _ingest_market_candles(
-                cursor,
-                client,
-                normalized_market,
-                start_ts=start_ts,
-                end_ts=end_ts,
-            )
-            if inserted:
-                LOGGER.info("Inserted %d recent prices for %s", inserted, market_id)
+            try:
+                inserted = _ingest_market_candles(
+                    cursor,
+                    client,
+                    normalized_market,
+                    start_ts=start_ts,
+                    end_ts=end_ts,
+                )
+                if inserted:
+                    LOGGER.info("Inserted %d recent prices for %s", inserted, market_id)
+            except NotFoundException:
+                LOGGER.warning("Skipping market %s: candlesticks not found", market_id)
+                continue
         conn.commit()
 
 
