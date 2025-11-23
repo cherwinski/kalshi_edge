@@ -153,6 +153,13 @@ def _ingest_market_candles(
     for row in _candles_to_price_rows(market_id, candles):
         if insert_price(cursor, row):
             inserted += 1
+
+    # If no candles inserted, try a one-off snapshot so we have a price.
+    if inserted == 0:
+        snap = _insert_quote_snapshot(cursor, client, market_id)
+        if snap:
+            LOGGER.info("Inserted %d snapshot price for %s", snap, market_id)
+            inserted += snap
     return inserted
 
 
