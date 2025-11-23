@@ -56,6 +56,12 @@ def minute_cycle() -> None:
         LOGGER.exception("minute_cycle: execute_signals failed")
 
     try:
+        # Refresh backtests/calibration so dashboard summaries stay current.
+        run_all_backtests()
+    except Exception:
+        LOGGER.exception("minute_cycle: backtests/calibration failed")
+
+    try:
         exits = process_take_profit_exits()
         if exits:
             LOGGER.info("minute_cycle: processed %s take-profit exits", exits)
