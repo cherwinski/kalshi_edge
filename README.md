@@ -31,10 +31,12 @@ Kalshi Bot
 - Per-trade size is derived from `risk_per_contract` (price for YES, 1-price for NO) and capped by:
   - `MIN(per_trade_cap, market cap, total cap)` where `per_trade_cap = MIN(MAX_RISK_PER_TRADE_USD, MAX_RISK_FRACTION_PER_TRADE * bankroll)`.
 - If the computed size is 0, the signal is ignored with a budget warning.
+- Auto take-profit exits: positions are scanned each scheduler loop and closed when the price moves by `TAKE_PROFIT_FACTOR` (default 4.0× entry; e.g., 1% -> 4%).
 
 ## Make targets / helpers
 
 - `make sync-positions` – pull portfolio positions from Kalshi into DB.
 - `make snapshot-pnl` – recompute realized/unrealized PnL snapshot for today.
 - `make signals` / `make execute-signals` – generate EV signals and execute them (simulate by default).
+- `make exit-positions` – run the take-profit exit pass once.
 - `make test-live-order` – tiny live/demo order smoke test (only with `EXECUTION_MODE=live`).

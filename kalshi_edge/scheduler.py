@@ -15,6 +15,7 @@ from .backtest.strategy_threshold import run_threshold_backtest
 from .ingest import historical_ingest
 from .signals.generate_signals import generate_signals
 from .execution.execute_signals import execute_signals
+from .execution.exit_positions import process_take_profit_exits
 from .portfolio.sync_positions import sync_positions
 from .portfolio.pnl import snapshot_account_pnl
 from .util.logging import get_logger
@@ -111,6 +112,13 @@ def run_all_backtests() -> None:
         LOGGER.info("Execution processed %s signals", processed)
     except Exception as exc:  # pragma: no cover - defensive
         LOGGER.exception("Error executing signals: %s", exc)
+
+    try:
+        exits = process_take_profit_exits()
+        if exits:
+            LOGGER.info("Processed %s take-profit exits", exits)
+    except Exception as exc:  # pragma: no cover - defensive
+        LOGGER.exception("Error processing take-profit exits: %s", exc)
 
     try:
         synced = sync_positions()

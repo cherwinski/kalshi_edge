@@ -133,6 +133,15 @@ def get_max_risk_fraction_per_trade() -> float:
         return 0.03
 
 
+def get_take_profit_factor() -> float:
+    """Multiple of entry price required to trigger take-profit exits."""
+
+    try:
+        return float(os.getenv("TAKE_PROFIT_FACTOR", "4.0"))
+    except ValueError:
+        return 4.0
+
+
 def get_current_bankroll_usd(conn) -> float:
     """
     Return current bankroll/equity.
@@ -165,5 +174,6 @@ __all__ = [
     "get_risk_limits",
     "get_initial_bankroll_usd",
     "get_max_risk_fraction_per_trade",
+    "get_take_profit_factor",
     "get_current_bankroll_usd",
 ]

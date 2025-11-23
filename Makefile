@@ -47,6 +47,9 @@ signals:
 execute-signals:
 	poetry run python -m kalshi_edge.execution.execute_signals
 
+exit-positions:
+	poetry run python -m kalshi_edge.execution.exit_positions
+
 sync-positions:
 	poetry run python -m kalshi_edge.portfolio.sync_positions
 
