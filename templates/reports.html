@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="card">
+  <h2>Backtest Results (recent)</h2>
+  {% if backtests %}
+  <table style="width:100%; border-collapse:collapse;">
+    <thead>
+      <tr>
+        <th style="text-align:left; padding:4px;">When</th>
+        <th style="text-align:left; padding:4px;">Strategy</th>
+        <th style="text-align:left; padding:4px;">Params</th>
+        <th style="text-align:left; padding:4px;">Trades</th>
+        <th style="text-align:left; padding:4px;">Win %</th>
+        <th style="text-align:left; padding:4px;">Avg Profit</th>
+        <th style="text-align:left; padding:4px;">Total Profit</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in backtests %}
+      <tr>
+        <td style="padding:4px;">{{ row.created_at }}</td>
+        <td style="padding:4px;">{{ row.strategy_name }}</td>
+        <td style="padding:4px;">{{ row.params }}</td>
+        <td style="padding:4px;">{{ row.num_trades }}</td>
+        <td style="padding:4px;">{{ "%.2f"|format(row.win_rate * 100) }}%</td>
+        <td style="padding:4px;">{{ "%.4f"|format(row.average_profit) }}</td>
+        <td style="padding:4px;">{{ "%.4f"|format(row.total_profit) }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+    <p>No backtest runs recorded yet.</p>
+  {% endif %}
+</section>
+
+<section class="card" style="margin-top:1rem;">
+  <h2>Calibration History</h2>
+  {% if calibrations %}
+  <table style="width:100%; border-collapse:collapse;">
+    <thead>
+      <tr>
+        <th style="text-align:left; padding:4px;">When</th>
+        <th style="text-align:left; padding:4px;">Mode</th>
+        <th style="text-align:left; padding:4px;">Params</th>
+        <th style="text-align:left; padding:4px;">Buckets</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in calibrations %}
+      <tr>
+        <td style="padding:4px;">{{ row.created_at }}</td>
+        <td style="padding:4px;">{{ row.binning_mode }}</td>
+        <td style="padding:4px;">{{ row.params }}</td>
+        <td style="padding:4px;">{{ row.buckets|length }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+    <p>No calibration history recorded yet.</p>
+  {% endif %}
+</section>
+{% endblock %}

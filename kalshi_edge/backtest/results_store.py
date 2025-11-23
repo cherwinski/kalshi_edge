@@ -86,6 +86,33 @@ def get_all_latest_backtest_results() -> Dict[str, Dict[str, Any]]:
     return get_latest_backtest_results()
 
 
+def list_backtest_results(limit: int = 200) -> List[Dict[str, Any]]:
+    """Return recent backtest results ordered by created_at desc."""
+
+    with get_connection() as conn, conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT strategy_name, params, num_trades, win_rate, average_profit, total_profit, raw_summary, created_at
+            FROM backtest_results
+            ORDER BY created_at DESC
+            LIMIT %s
+            """,
+            (limit,),
+        )
+        rows = cur.fetchall()
+    keys = [
+        "strategy_name",
+        "params",
+        "num_trades",
+        "win_rate",
+        "average_profit",
+        "total_profit",
+        "raw_summary",
+        "created_at",
+    ]
+    return [dict(zip(keys, row)) for row in rows]
+
+
 def save_calibration_result(
     binning_mode: str, params: Dict[str, Any], buckets: List[Dict[str, Any]]
 ) -> None:
@@ -136,10 +163,30 @@ def get_latest_calibration_result(binning_mode: str = "extreme") -> Optional[Dic
         }
 
 
+def list_calibration_results(limit: int = 100) -> List[Dict[str, Any]]:
+    """Return recent calibration results ordered by created_at desc."""
+
+    with get_connection() as conn, conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT binning_mode, params, buckets, created_at
+            FROM calibration_results
+            ORDER BY created_at DESC
+            LIMIT %s
+            """,
+            (limit,),
+        )
+        rows = cur.fetchall()
+    keys = ["binning_mode", "params", "buckets", "created_at"]
+    return [dict(zip(keys, row)) for row in rows]
+
+
 __all__ = [
     "save_backtest_result",
     "get_latest_backtest_results",
     "get_all_latest_backtest_results",
+    "list_backtest_results",
     "save_calibration_result",
     "get_latest_calibration_result",
+    "list_calibration_results",
 ]

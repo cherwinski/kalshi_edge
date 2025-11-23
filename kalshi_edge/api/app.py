@@ -10,6 +10,8 @@ from fastapi.templating import Jinja2Templates
 from ..backtest.results_store import (
     get_all_latest_backtest_results,
     get_latest_calibration_result,
+    list_backtest_results,
+    list_calibration_results,
 )
 from ..db import get_connection
 
@@ -184,6 +186,20 @@ def dashboard(request: Request) -> Any:
         latest.get("strategy_0_90")
         or latest.get("threshold_yes_0.90")
         or latest.get("threshold_yes_0.9")
+    )
+
+
+@app.get("/reports")
+def reports(request: Request) -> Any:
+    backtests = list_backtest_results(limit=200)
+    calibrations = list_calibration_results(limit=50)
+    return templates.TemplateResponse(
+        "reports.html",
+        {
+            "request": request,
+            "backtests": backtests,
+            "calibrations": calibrations,
+        },
     )
     strategy_0_10 = (
         latest.get("strategy_0_10")
