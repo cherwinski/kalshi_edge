@@ -16,6 +16,8 @@ MAX_SIGNALS_DEFAULT = 100
 EXPIRY_HARD_LIMIT_HOURS = 24
 PRO_SPORTS_LONGSHOT_THRESHOLD = 0.15
 PRO_SPORTS_CATEGORIES = {"sports", "nfl", "nba", "nhl", "football", "basketball", "hockey"}
+COLLEGE_LONGSHOT_THRESHOLD = 0.02
+COLLEGE_CATEGORIES = {"college", "ncaa", "ncaaf", "ncaab"}
 
 
 def _build_probability_lookup() -> Callable[[float], float]:
@@ -121,6 +123,8 @@ def generate_signals(ev_threshold: float = EV_THRESHOLD_DEFAULT, max_signals: in
 
             is_pro_sport = (cat or "").lower() in PRO_SPORTS_CATEGORIES
             longshot_yes = is_pro_sport and float(p_mkt) <= PRO_SPORTS_LONGSHOT_THRESHOLD
+            is_college = (cat or "").lower() in COLLEGE_CATEGORIES
+            longshot_college = is_college and float(p_mkt) <= COLLEGE_LONGSHOT_THRESHOLD
 
             candidates: List[Tuple[str, float, bool]] = []
             if ev_yes >= ev_threshold:
@@ -129,6 +133,9 @@ def generate_signals(ev_threshold: float = EV_THRESHOLD_DEFAULT, max_signals: in
                 candidates.append(("no", ev_no, False))
             # Pro sports long-shot rule: take YES if price <= 15% within 24h window regardless of EV.
             if longshot_yes:
+                candidates.append(("yes", ev_yes, True))
+            # College sports long-shot rule: take YES at <=2% within 24h.
+            if longshot_college:
                 candidates.append(("yes", ev_yes, True))
 
             for side, ev, forced in candidates:

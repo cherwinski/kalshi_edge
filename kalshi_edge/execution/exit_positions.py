@@ -29,6 +29,7 @@ def _fetch_positions_with_prices(cur: RealDictCursor) -> List[Dict[str, Any]]:
             p.side,
             p.size,
             p.avg_entry_price,
+            m.category,
             m.expiration_ts,
             lp.last_yes AS current_price
         FROM positions p
@@ -77,6 +78,7 @@ def process_take_profit_exits() -> int:
             entry = float(pos["avg_entry_price"] or 0.0)
             current = pos.get("current_price")
             exp_ts = pos.get("expiration_ts")
+            cat = (pos.get("category") or "").lower()
 
             if size <= 0 or side not in ("yes", "no"):
                 continue
@@ -86,7 +88,14 @@ def process_take_profit_exits() -> int:
                 continue
             current = float(current)
 
-            if not _should_take_profit(side, entry, current, factor):
+            college_fast_exit = (
+                cat in {"college", "ncaa", "ncaaf", "ncaab"}
+                and side == "yes"
+                and entry <= 0.02
+                and current >= 0.10
+            )
+
+            if not (_should_take_profit(side, entry, current, factor) or college_fast_exit):
                 continue
 
             direction = "sell"  # closing reduces exposure
