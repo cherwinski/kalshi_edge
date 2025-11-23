@@ -35,6 +35,8 @@ def sync_positions() -> int:
     updated = 0
 
     with connection_ctx() as conn, conn.cursor() as cur:
+        # Reset to reflect current portfolio; avoids stale/cancelled orders lingering locally.
+        cur.execute("TRUNCATE positions;")
         for pos in positions:
             ticker = getattr(pos, "ticker", None)
             count = getattr(pos, "position", None)
