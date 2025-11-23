@@ -239,6 +239,7 @@ def ingest_recent(
     lookback_hours: int = 1,
     status: str = "open",
     limit_markets: Optional[int] = None,
+    expire_within_hours: Optional[int] = 24,
 ) -> None:
     """Incremental ingest using Kalshi candlesticks for the last N hours."""
 
@@ -261,6 +262,23 @@ def ingest_recent(
             series_lookup[normalized["market_id"]] = normalized.get("series_ticker")
 
         target_ids = _recent_market_ids(conn, cutoff)
+        if expire_within_hours is not None:
+            upper = now + timedelta(hours=expire_within_hours)
+            with conn.cursor() as _cur:
+                _cur.execute(
+                    """
+                    SELECT market_id, expiration_ts
+                    FROM markets
+                    WHERE market_id = ANY(%s)
+                    """,
+                    (target_ids,),
+                )
+                exp_map = {row[0]: row[1] for row in _cur.fetchall()}
+            target_ids = [
+                mid
+                for mid in target_ids
+                if (exp_map.get(mid) is None) or (exp_map.get(mid) <= upper)
+            ]
         for market_id in target_ids:
             normalized_market = {
                 "market_id": market_id,
