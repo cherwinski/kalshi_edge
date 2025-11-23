@@ -22,6 +22,7 @@ COLLEGE_MIN_REMAINING = timedelta(hours=1)
 PRO_INPLAY_BAND_LOW = 0.88
 PRO_INPLAY_BAND_HIGH = 0.92
 SPORTS_INPLAY_MAX_REMAINING = timedelta(minutes=30)
+SPORT_TICKER_HINTS = ("NFL", "NBA", "NHL", "MLB", "EPL", "MLS", "NCAAF", "NCAAB", "START", "GAME")
 
 
 def _build_probability_lookup() -> Callable[[float], float]:
@@ -134,10 +135,12 @@ def generate_signals(ev_threshold: float = EV_THRESHOLD_DEFAULT, max_signals: in
                 and (exp_ts - now) >= COLLEGE_MIN_REMAINING
             )
             cat_lower = (cat or "").lower()
+            ticker_upper = market_id.upper()
             is_sport_any = (
                 is_pro_sport
                 or is_college
                 or ("sport" in cat_lower)
+                or any(hint in ticker_upper for hint in SPORT_TICKER_HINTS)
             )
             remaining = exp_ts - now
             pro_inplay_band = (
