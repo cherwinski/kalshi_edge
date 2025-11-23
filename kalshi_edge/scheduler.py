@@ -35,6 +35,40 @@ def ingest_recent_data(lookback_hours: int = 1) -> None:
     historical_ingest.ingest_recent(lookback_hours=lookback_hours)
 
 
+def minute_cycle() -> None:
+    """Fast loop to ingest, generate/execute signals, exits, and resync positions."""
+
+    try:
+        ingest_recent_data(lookback_hours=1)
+    except Exception:
+        LOGGER.exception("minute_cycle: ingest failed")
+
+    try:
+        generated = generate_signals(ev_threshold=0.02, max_signals=100)
+        LOGGER.info("minute_cycle: generated %s signals", generated)
+    except Exception:
+        LOGGER.exception("minute_cycle: generate_signals failed")
+
+    try:
+        processed = execute_signals()
+        LOGGER.info("minute_cycle: executed %s signals", processed)
+    except Exception:
+        LOGGER.exception("minute_cycle: execute_signals failed")
+
+    try:
+        exits = process_take_profit_exits()
+        if exits:
+            LOGGER.info("minute_cycle: processed %s take-profit exits", exits)
+    except Exception:
+        LOGGER.exception("minute_cycle: exits failed")
+
+    try:
+        synced = sync_positions()
+        LOGGER.info("minute_cycle: synced %s positions", synced)
+    except Exception:
+        LOGGER.exception("minute_cycle: sync_positions failed")
+
+
 def run_all_backtests() -> None:
     """Execute both strategies and refresh the calibration curve."""
 
@@ -142,7 +176,8 @@ def _safe_job(job: Callable[..., Any], *args: Any, **kwargs: Any) -> None:
 
 def main() -> None:
     LOGGER.info("Starting kalshi_edge scheduler")
-    schedule.every(1).minutes.do(_safe_job, ingest_recent_data)
+    # Run the fast loop every minute: ingest, signals, execution, exits, sync.
+    schedule.every(1).minutes.do(_safe_job, minute_cycle)
     schedule.every().day.at("02:00").do(_safe_job, run_all_backtests)
 
     while True:
