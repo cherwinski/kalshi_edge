@@ -1,0 +1,161 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="grid">
+  <div class="card">
+    <h2>Strategy 0.90</h2>
+    {% if summary.strategy_0_90 %}
+      <p><strong>Trades:</strong> {{ summary.strategy_0_90.num_trades }}</p>
+      <p><strong>Win rate:</strong> {{ "%.2f"|format(summary.strategy_0_90.win_rate * 100) }}%</p>
+      <p><strong>Avg profit:</strong> {{ "%.4f"|format(summary.strategy_0_90.average_profit) }}</p>
+      <p><strong>Total profit:</strong> {{ "%.4f"|format(summary.strategy_0_90.total_profit) }}</p>
+    {% else %}
+      <p>No data yet. Run the scheduler once to populate results.</p>
+    {% endif %}
+  </div>
+  <div class="card">
+    <h2>Strategy 0.10</h2>
+    {% if summary.strategy_0_10 %}
+      <p><strong>Trades:</strong> {{ summary.strategy_0_10.num_trades }}</p>
+      <p><strong>Win rate:</strong> {{ "%.2f"|format(summary.strategy_0_10.win_rate * 100) }}%</p>
+      <p><strong>Avg profit:</strong> {{ "%.4f"|format(summary.strategy_0_10.average_profit) }}</p>
+      <p><strong>Total profit:</strong> {{ "%.4f"|format(summary.strategy_0_10.total_profit) }}</p>
+    {% else %}
+      <p>No data yet. Run the scheduler once to populate results.</p>
+    {% endif %}
+  </div>
+</section>
+
+<section class="card" style="margin-top: 1rem;">
+  <h2>Threshold Performance</h2>
+  {% if thresholds %}
+  <table style="width: 100%; border-collapse: collapse;">
+    <thead>
+      <tr>
+        <th style="text-align: left; padding: 4px;">Threshold</th>
+        <th style="text-align: left; padding: 4px;">Direction</th>
+        <th style="text-align: left; padding: 4px;">Trades</th>
+        <th style="text-align: left; padding: 4px;">Win Rate</th>
+        <th style="text-align: left; padding: 4px;">Avg Profit</th>
+        <th style="text-align: left; padding: 4px;">Total Profit</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for name, result in thresholds.items() %}
+      <tr>
+        <td style="padding: 4px;">{{ result.params.threshold }}</td>
+        <td style="padding: 4px; text-transform: uppercase;">{{ result.params.direction }}</td>
+        <td style="padding: 4px;">{{ result.num_trades }}</td>
+        <td style="padding: 4px;">{{ "%.2f"|format(result.win_rate * 100) }}%</td>
+        <td style="padding: 4px;">{{ "%.4f"|format(result.average_profit) }}</td>
+        <td style="padding: 4px;">{{ "%.4f"|format(result.total_profit) }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+    <p>No threshold results yet. Run the scheduler to populate data.</p>
+  {% endif %}
+</section>
+<section class="chart-container">
+  <h2>Calibration</h2>
+  <canvas id="calibrationChart"></canvas>
+  <p id="calibration-error" style="color: red; display: none;">Error loading calibration data.</p>
+</section>
+
+<section class="card" style="margin-top: 1rem;">
+  <h2>Recent Signals</h2>
+  {% if signals %}
+  <table style="width: 100%; border-collapse: collapse;">
+    <thead>
+      <tr>
+        <th style="text-align: left; padding: 4px;">Time</th>
+        <th style="text-align: left; padding: 4px;">Market</th>
+        <th style="text-align: left; padding: 4px;">Side</th>
+        <th style="text-align: left; padding: 4px;">Category</th>
+        <th style="text-align: left; padding: 4px;">Expiry</th>
+        <th style="text-align: left; padding: 4px;">p_mkt</th>
+        <th style="text-align: left; padding: 4px;">p_true</th>
+        <th style="text-align: left; padding: 4px;">EV</th>
+        <th style="text-align: left; padding: 4px;">Size</th>
+        <th style="text-align: left; padding: 4px;">Status</th>
+        <th style="text-align: left; padding: 4px;">Exec Mode</th>
+        <th style="text-align: left; padding: 4px;">Order ID</th>
+        <th style="text-align: left; padding: 4px;">Exec Price</th>
+        <th style="text-align: left; padding: 4px;">Error</th>
+      </tr>
+    </thead>
+    <tbody id="signals-body">
+      {% for sig in signals %}
+      <tr>
+        <td style="padding: 4px;">{{ sig.created_at }}</td>
+        <td style="padding: 4px;">{{ sig.market_ticker }}</td>
+        <td style="padding: 4px; text-transform: uppercase;">{{ sig.side }}</td>
+        <td style="padding: 4px;">{{ sig.category or "" }}</td>
+        <td style="padding: 4px;">{{ sig.expiry_bucket or "" }}</td>
+        <td style="padding: 4px;">{{ "%.3f"|format(sig.p_mkt) }}</td>
+        <td style="padding: 4px;">{{ "%.3f"|format(sig.p_true_est) }}</td>
+        <td style="padding: 4px;">{{ "%.4f"|format(sig.expected_value) }}</td>
+        <td style="padding: 4px;">{{ sig.size }}</td>
+        <td style="padding: 4px;">{{ sig.status }}</td>
+        <td style="padding: 4px;">{{ sig.execution_mode or "" }}</td>
+        <td style="padding: 4px;">{{ sig.order_id or "" }}</td>
+        <td style="padding: 4px;">{{ sig.executed_price if sig.executed_price is not none else "" }}</td>
+        <td style="padding: 4px;">{{ sig.last_error or "" }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+    <p>No signals yet. Run the scheduler to populate data.</p>
+  {% endif %}
+  <p id="signals-error" style="color:red; display:none;">Error loading signals.</p>
+</section>
+<script>
+  async function loadCalibration() {
+    try {
+      const res = await fetch('/calibration');
+      if (!res.ok) throw new Error('Failed to load calibration');
+      const buckets = await res.json();
+      const xs = buckets.map(b => (b.bucket_low + b.bucket_high) / 2);
+      const ys = buckets.map(b => b.p_true ?? 0);
+      const perfect = xs;
+
+      const ctx = document.getElementById('calibrationChart').getContext('2d');
+      new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: xs,
+          datasets: [
+            {
+              label: 'Observed',
+              data: ys,
+              borderColor: 'rgba(54, 162, 235, 1)',
+              backgroundColor: 'rgba(54, 162, 235, 0.2)',
+              fill: false,
+            },
+            {
+              label: 'Perfect calibration',
+              data: perfect,
+              borderColor: 'rgba(200, 200, 200, 1)',
+              borderDash: [5, 5],
+              fill: false,
+            },
+          ],
+        },
+        options: {
+          responsive: true,
+          scales: {
+            x: { title: { display: true, text: 'Market-implied probability' } },
+            y: { title: { display: true, text: 'Empirical YES frequency' }, min: 0, max: 1 },
+          },
+        },
+      });
+    } catch (err) {
+      console.error(err);
+      document.getElementById('calibration-error').style.display = 'block';
+    }
+  }
+
+  loadCalibration();
+</script>
+{% endblock %}
