@@ -1,0 +1,12 @@
+# Python / env
+.venv/
+__pycache__/
+.mypy_cache/
+.pytest_cache/
+
+# Editor / OS
+.DS_Store
+
+# Secrets
+.env
+*.pem
