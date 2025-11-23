@@ -277,7 +277,7 @@ def ingest_recent(
             target_ids = [
                 mid
                 for mid in target_ids
-                if (exp_map.get(mid) is None) or (exp_map.get(mid) <= upper)
+                if (exp_map.get(mid) is not None) and (exp_map.get(mid) <= upper)
             ]
         for market_id in target_ids:
             normalized_market = {
