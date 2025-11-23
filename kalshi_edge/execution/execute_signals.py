@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Mapping
 import math
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 from kalshi_edge.config import (
     get_execution_mode,
@@ -98,15 +98,18 @@ def compute_existing_risk(conn) -> Dict[str, Any]:
     try:
         cur.execute(
             """
-            SELECT p.market_ticker, p.side, p.size, p.avg_entry_price, m.expiration_ts
+            SELECT p.market_ticker, p.side, p.size, p.avg_entry_price, m.expiration_ts, p.updated_at
             FROM positions p
             LEFT JOIN markets m ON p.market_ticker = m.market_id
             """
         )
         now = datetime.now(timezone.utc)
-        for market_ticker, side, size, avg_price, expiration_ts in cur.fetchall():
-            # Ignore positions without a valid future expiry; avoids stale rows.
+        stale_cutoff = now - timedelta(days=2)
+        for market_ticker, side, size, avg_price, expiration_ts, updated_at in cur.fetchall():
+            # Ignore positions without a valid future expiry or very stale updates.
             if not expiration_ts or expiration_ts < now:
+                continue
+            if updated_at and updated_at < stale_cutoff:
                 continue
             avg_price = _norm_price(avg_price)
             if side == "yes":

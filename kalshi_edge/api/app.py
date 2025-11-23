@@ -210,15 +210,18 @@ def get_current_exposure() -> Dict[str, float]:
         cur = conn.cursor()
         cur.execute(
             """
-            SELECT p.side, p.avg_entry_price, p.size, m.expiration_ts
+            SELECT p.side, p.avg_entry_price, p.size, m.expiration_ts, p.updated_at
             FROM positions p
             LEFT JOIN markets m ON p.market_ticker = m.market_id
             """
         )
         now = datetime.now(timezone.utc)
-        for side, avg_price, size, expiration_ts in cur.fetchall():
-            # Ignore positions with no known future expiry to avoid stale rows.
+        stale_cutoff = now - timedelta(days=2)
+        for side, avg_price, size, expiration_ts, updated_at in cur.fetchall():
+            # Ignore positions with no known future expiry or very stale rows.
             if not expiration_ts or expiration_ts < now:
+                continue
+            if updated_at and updated_at < stale_cutoff:
                 continue
             pos_risk += _risk(side, avg_price, size)
 
