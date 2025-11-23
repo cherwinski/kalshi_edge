@@ -161,6 +161,7 @@
         <th style="text-align: left; padding: 4px;">EV</th>
         <th style="text-align: left; padding: 4px;">Size</th>
         <th style="text-align: left; padding: 4px;">Status</th>
+        <th style="text-align: left; padding: 4px;">Rule</th>
         <th style="text-align: left; padding: 4px;">Exec Mode</th>
         <th style="text-align: left; padding: 4px;">Order ID</th>
         <th style="text-align: left; padding: 4px;">Exec Price</th>
@@ -180,6 +181,7 @@
         <td style="padding: 4px;">{{ "%.4f"|format(sig.expected_value) }}</td>
         <td style="padding: 4px;">{{ sig.size }}</td>
         <td style="padding: 4px;">{{ sig.status }}</td>
+        <td style="padding: 4px;">{{ sig.rule }}</td>
         <td style="padding: 4px;">{{ sig.execution_mode or "" }}</td>
         <td style="padding: 4px;">{{ sig.order_id or "" }}</td>
         <td style="padding: 4px;">{{ sig.executed_price if sig.executed_price is not none else "" }}</td>

@@ -68,6 +68,21 @@ def calibration_buckets() -> List[Dict[str, Any]]:
 
 
 def get_recent_signals(limit: int = 100) -> List[Dict[str, Any]]:
+    def classify_rule(sig: Dict[str, Any]) -> str:
+        """Lightweight justification tag based on pricing/rules."""
+
+        side = (sig.get("side") or "").lower()
+        p = float(sig.get("p_mkt") or 0.0)
+        yes_prob = p if side == "yes" else (1.0 - p)
+
+        if 0.88 <= yes_prob <= 0.92:
+            return "Primary 88-92% rule"
+        if yes_prob <= 0.02:
+            return "College long-shot rule"
+        if yes_prob <= 0.15:
+            return "Pro long-shot rule"
+        return "Other/override"
+
     conn = get_connection()
     try:
         cur = conn.cursor()
@@ -104,7 +119,12 @@ def get_recent_signals(limit: int = 100) -> List[Dict[str, Any]]:
         "executed_size",
         "last_error",
     ]
-    return [dict(zip(keys, row)) for row in rows]
+    out: List[Dict[str, Any]] = []
+    for row in rows:
+        sig = dict(zip(keys, row))
+        sig["rule"] = classify_rule(sig)
+        out.append(sig)
+    return out
 
 
 @app.get("/signals")
