@@ -126,10 +126,35 @@ def generate_signals(ev_threshold: float = EV_THRESHOLD_DEFAULT, max_signals: in
                 continue
             bucket = _expiry_bucket(exp_ts)
 
-            # Enforce high-probability band (88-92%) unless explicitly overridden.
+            cat_lower = (cat or "").lower()
+            ticker_upper = market_id.upper()
+            is_pro_sport = cat_lower in PRO_SPORTS_CATEGORIES
+            is_college = cat_lower in COLLEGE_CATEGORIES
+            is_sport_any = (
+                is_pro_sport
+                or is_college
+                or ("sport" in cat_lower)
+                or any(hint in ticker_upper for hint in SPORT_TICKER_HINTS)
+            )
             price = float(p_mkt)
-            if price < PRO_INPLAY_BAND_LOW or price > PRO_INPLAY_BAND_HIGH:
-                LOGGER.debug("Skipping %s due to price band constraint (p=%.3f)", market_id, price)
+
+            # Primary rule: only 88-92% band unless an explicit override applies.
+            allow_band = PRO_INPLAY_BAND_LOW <= price <= PRO_INPLAY_BAND_HIGH
+
+            # Overrides:
+            longshot_yes = is_pro_sport and price <= PRO_SPORTS_LONGSHOT_THRESHOLD
+            longshot_college = (
+                is_college
+                and price <= COLLEGE_LONGSHOT_THRESHOLD
+                and (exp_ts - now) >= COLLEGE_MIN_REMAINING
+            )
+            remaining = exp_ts - now
+            pro_inplay_override = (
+                is_sport_any and allow_band and remaining <= SPORTS_INPLAY_MAX_REMAINING and remaining > timedelta(0)
+            )
+
+            if not (allow_band or longshot_yes or longshot_college or pro_inplay_override):
+                LOGGER.debug("Skipping %s due to band/override constraints (p=%.3f)", market_id, price)
                 continue
 
             candidates: List[Tuple[str, float, bool]] = []
@@ -137,6 +162,14 @@ def generate_signals(ev_threshold: float = EV_THRESHOLD_DEFAULT, max_signals: in
                 candidates.append(("yes", ev_yes, False))
             if ev_no >= ev_threshold:
                 candidates.append(("no", ev_no, False))
+
+            # Add override-driven signals
+            if longshot_yes:
+                candidates.append(("yes", ev_yes, True))
+            if longshot_college:
+                candidates.append(("yes", ev_yes, True))
+            if pro_inplay_override and allow_band:
+                candidates.append(("yes", ev_yes, True))
 
             for side, ev, forced in candidates:
                 cursor.execute(
