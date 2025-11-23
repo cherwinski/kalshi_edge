@@ -19,6 +19,9 @@ PRO_SPORTS_CATEGORIES = {"sports", "nfl", "nba", "nhl", "football", "basketball"
 COLLEGE_LONGSHOT_THRESHOLD = 0.02
 COLLEGE_CATEGORIES = {"college", "ncaa", "ncaaf", "ncaab"}
 COLLEGE_MIN_REMAINING = timedelta(hours=1)
+PRO_INPLAY_BAND_LOW = 0.88
+PRO_INPLAY_BAND_HIGH = 0.92
+PRO_INPLAY_MAX_REMAINING = timedelta(hours=6)
 
 
 def _build_probability_lookup() -> Callable[[float], float]:
@@ -130,6 +133,11 @@ def generate_signals(ev_threshold: float = EV_THRESHOLD_DEFAULT, max_signals: in
                 and float(p_mkt) <= COLLEGE_LONGSHOT_THRESHOLD
                 and (exp_ts - now) >= COLLEGE_MIN_REMAINING
             )
+            pro_inplay_band = (
+                is_pro_sport
+                and PRO_INPLAY_BAND_LOW <= float(p_mkt) <= PRO_INPLAY_BAND_HIGH
+                and (exp_ts - now) <= PRO_INPLAY_MAX_REMAINING
+            )
 
             candidates: List[Tuple[str, float, bool]] = []
             if ev_yes >= ev_threshold:
@@ -141,6 +149,9 @@ def generate_signals(ev_threshold: float = EV_THRESHOLD_DEFAULT, max_signals: in
                 candidates.append(("yes", ev_yes, True))
             # College sports long-shot rule: take YES at <=2% within 24h.
             if longshot_college:
+                candidates.append(("yes", ev_yes, True))
+            # Pro sports in-play band: grab high-probability edges between 88-92% in late stages (<=6h remaining).
+            if pro_inplay_band:
                 candidates.append(("yes", ev_yes, True))
 
             for side, ev, forced in candidates:
