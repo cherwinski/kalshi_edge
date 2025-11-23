@@ -143,6 +143,15 @@ def get_take_profit_factor() -> float:
         return 4.0
 
 
+def get_pro_longshot_take_profit_factor() -> float:
+    """Take-profit factor specifically for pro long-shot entries (default 2.2x)."""
+
+    try:
+        return float(os.getenv("PRO_LONGSHOT_TP_FACTOR", "2.2"))
+    except ValueError:
+        return 2.2
+
+
 def get_current_bankroll_usd(conn) -> float:
     """
     Return current bankroll/equity.

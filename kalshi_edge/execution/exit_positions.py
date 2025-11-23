@@ -6,7 +6,12 @@ from typing import Any, Dict, List
 
 from psycopg2.extras import RealDictCursor
 
-from ..config import get_execution_mode, get_kalshi_env, get_take_profit_factor
+from ..config import (
+    get_execution_mode,
+    get_kalshi_env,
+    get_take_profit_factor,
+    get_pro_longshot_take_profit_factor,
+)
 from ..db import get_connection
 from ..execution.client import ExecutionClient, OrderRequest
 from ..portfolio.pnl import record_trade
@@ -45,9 +50,21 @@ def _should_take_profit(side: str, entry: float, current: float, factor: float) 
     if current is None or entry is None or entry <= 0:
         return False
     if side == "yes":
-        return current >= entry * factor
+        target = min(1.0, entry * factor)
+        return current >= target
     # side == "no": price fall is good
-    return current <= entry / factor
+    target = max(0.0, entry / factor)
+    return current <= target
+
+
+def _is_pro_longshot(side: str, entry: float, category: str | None) -> bool:
+    if side != "yes":
+        return False
+    if entry is None or entry <= 0:
+        return False
+    cat = (category or "").lower()
+    pro_cats = {"sports", "football", "basketball", "hockey", "nfl", "nba", "nhl", "mlb"}
+    return entry <= 0.15 and (cat in pro_cats or cat.startswith("pro"))
 
 
 def process_take_profit_exits() -> int:
@@ -55,7 +72,8 @@ def process_take_profit_exits() -> int:
 
     mode = get_execution_mode()
     env = get_kalshi_env()
-    factor = get_take_profit_factor()
+    factor_general = get_take_profit_factor()
+    factor_longshot = get_pro_longshot_take_profit_factor()
     now = datetime.now(timezone.utc)
     hard_cutoff = now + timedelta(hours=EXPIRY_HARD_LIMIT_HOURS)
 
@@ -88,6 +106,7 @@ def process_take_profit_exits() -> int:
                 continue
             current = float(current)
 
+            factor = factor_longshot if _is_pro_longshot(side, entry, cat) else factor_general
             college_fast_exit = (
                 cat in {"college", "ncaa", "ncaaf", "ncaab"}
                 and side == "yes"
