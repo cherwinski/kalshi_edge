@@ -301,7 +301,7 @@ def ingest_recent(
                 if snap:
                     LOGGER.info("Inserted %d snapshot price for %s", snap, market_id)
                 continue
-        conn.commit()
+            conn.commit()
 
 
 def main() -> None:
