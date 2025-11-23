@@ -44,6 +44,18 @@ def _parse_dt(value: Any) -> Optional[datetime]:
 
 
 def normalize_market(market: Dict[str, Any]) -> Dict[str, Any]:
+    exp_candidates = [
+        market.get("expiration_time"),
+        market.get("close_time"),
+        market.get("expected_expiration_time"),
+    ]
+    exp_ts = None
+    for candidate in exp_candidates:
+        dt = _parse_dt(candidate)
+        if dt:
+            if exp_ts is None or dt < exp_ts:
+                exp_ts = dt
+
     return {
         "market_id": market.get("ticker") or market.get("market_id") or market.get("id"),
         "name": market.get("title") or market.get("name") or market.get("ticker"),
@@ -51,7 +63,7 @@ def normalize_market(market: Dict[str, Any]) -> Dict[str, Any]:
         "resolution": market.get("result") or market.get("status"),
         "resolved_at": _parse_dt(market.get("expiration_time") or market.get("close_time")),
         "created_at": _parse_dt(market.get("open_time")),
-        "expiration_ts": _parse_dt(market.get("expiration_time") or market.get("close_time")),
+        "expiration_ts": exp_ts,
         "series_ticker": market.get("series_ticker") or market.get("seriesTicker"),
     }
 
