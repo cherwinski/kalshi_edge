@@ -160,7 +160,7 @@ def _insert_quote_snapshot(cursor, client: KalshiSDKClient, market_id: str) -> i
     """Fallback when candlesticks are unavailable: insert a single quote snapshot."""
 
     try:
-        quote = client.markets_api.get_market(market_ticker=market_id)
+        quote = client.markets_api.get_market(ticker=market_id)
     except Exception as exc:  # pragma: no cover - defensive fallback
         LOGGER.warning("Snapshot fetch failed for %s: %s", market_id, exc)
         return 0
