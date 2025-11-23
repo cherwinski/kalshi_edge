@@ -182,12 +182,20 @@ def list_trades(limit: int = 100) -> List[Dict[str, Any]]:
 def get_current_exposure() -> Dict[str, float]:
     """Estimate current risk in play from positions and open signals."""
 
+    def _norm_price(price: float) -> float:
+        try:
+            p = float(price or 0.0)
+        except Exception:
+            return 0.0
+        if p > 1.0:
+            p = p / 100.0
+        if p < 0:
+            p = 0.0
+        return p
+
     def _risk(side: str, price: float, size: int) -> float:
         side = (side or "").lower()
-        try:
-            price_f = float(price or 0.0)
-        except Exception:
-            price_f = 0.0
+        price_f = _norm_price(price)
         size_i = abs(int(size or 0))
         if size_i <= 0:
             return 0.0

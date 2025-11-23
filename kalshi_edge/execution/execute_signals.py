@@ -66,6 +66,17 @@ def estimate_trade_risk_usd(signal: Dict[str, Any]) -> float:
 
 
 def compute_existing_risk(conn) -> Dict[str, Any]:
+    def _norm_price(val: float) -> float:
+        try:
+            p = float(val)
+        except Exception:
+            return 0.0
+        if p > 1.0:
+            p = p / 100.0
+        if p < 0:
+            p = 0.0
+        return p
+
     cur = conn.cursor()
     cur.execute(
         """
@@ -77,7 +88,7 @@ def compute_existing_risk(conn) -> Dict[str, Any]:
     per_market: Dict[str, float] = {}
     total = 0.0
     for market_ticker, side, p_mkt, size in cur.fetchall():
-        sig = {"market_ticker": market_ticker, "side": side, "p_mkt": float(p_mkt), "size": int(size)}
+        sig = {"market_ticker": market_ticker, "side": side, "p_mkt": _norm_price(p_mkt), "size": int(size)}
         r = estimate_trade_risk_usd(sig)
         per_market[market_ticker] = per_market.get(market_ticker, 0.0) + r
         total += r
@@ -86,6 +97,7 @@ def compute_existing_risk(conn) -> Dict[str, Any]:
     try:
         cur.execute("SELECT market_ticker, side, size, avg_entry_price FROM positions")
         for market_ticker, side, size, avg_price in cur.fetchall():
+            avg_price = _norm_price(avg_price)
             if side == "yes":
                 r = abs(avg_price * size)
             else:
