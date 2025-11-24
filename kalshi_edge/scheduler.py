@@ -21,8 +21,11 @@ from .portfolio.pnl import snapshot_account_pnl
 from .util.logging import get_logger
 
 LOGGER = get_logger(__name__)
-HIGH_THRESHOLDS = [0.80, 0.85, 0.90, 0.95]
-LOW_THRESHOLDS = [0.20, 0.15, 0.10, 0.05]
+# Fine-grained threshold grid:
+# - Low side: 0.01 through 0.15 (inclusive) in 0.01 increments.
+# - High side: 0.80 through 0.99 (inclusive) in 0.01 increments.
+LOW_THRESHOLDS = [round(x / 100, 2) for x in range(1, 16)]
+HIGH_THRESHOLDS = [round(x / 100, 2) for x in range(80, 100)]
 # TODO: expand categories once payloads are confirmed; start with None only.
 CATEGORIES = [None]
 EXPIRY_BUCKETS = [None, "short", "medium", "long"]
