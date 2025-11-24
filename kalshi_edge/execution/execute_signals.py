@@ -291,11 +291,14 @@ def execute_signals(batch_limit: int = 50) -> int:
             continue
 
         if mode == "simulate":
+            exec_price = float(sig["p_mkt"])
+            if (sig.get("side") or "").lower() == "no":
+                exec_price = 1.0 - exec_price
             update_signal_execution(
                 sig_id,
                 status="simulated",
                 execution_mode=mode,
-                executed_price=float(sig["p_mkt"]),
+                executed_price=exec_price,
                 executed_size=size,
             )
             record_trade(
@@ -304,13 +307,15 @@ def execute_signals(batch_limit: int = 50) -> int:
                     "market_ticker": market_ticker,
                     "side": sig["side"],
                     "size": size,
-                    "price": float(sig["p_mkt"]),
+                    "price": exec_price,
                     "direction": trade_direction,
                 }
             )
         else:
             try:
                 limit_price = float(sig["p_mkt"])
+                if (sig.get("side") or "").lower() == "no":
+                    limit_price = 1.0 - limit_price
                 order_req = OrderRequest(
                     market_ticker=market_ticker,
                     side=sig["side"],
