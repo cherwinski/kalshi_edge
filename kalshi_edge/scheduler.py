@@ -30,7 +30,7 @@ HIGH_THRESHOLDS = [round(x / 100, 2) for x in range(80, 100)]
 CATEGORIES = [None]
 # To keep backtests fast for dashboard, only run unbucketed expiry.
 EXPIRY_BUCKETS = [None]
-BACKTEST_SINCE_HOURS = 24 * 7  # last 7 days
+BACKTEST_SINCE_HOURS = 24 * 90  # last ~90 days
 BACKTEST_ALLOWED_CATEGORIES = {"sports", "football", "basketball", "hockey", "nfl", "nba", "nhl"}
 
 
