@@ -28,7 +28,8 @@ LOW_THRESHOLDS = [round(x / 100, 2) for x in range(1, 16)]
 HIGH_THRESHOLDS = [round(x / 100, 2) for x in range(80, 100)]
 # TODO: expand categories once payloads are confirmed; start with None only.
 CATEGORIES = [None]
-EXPIRY_BUCKETS = [None, "short", "medium", "long"]
+# To keep backtests fast for dashboard, only run unbucketed expiry.
+EXPIRY_BUCKETS = [None]
 
 
 def ingest_recent_data(lookback_hours: int = 1) -> None:
