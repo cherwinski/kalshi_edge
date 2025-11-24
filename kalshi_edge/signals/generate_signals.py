@@ -164,10 +164,15 @@ def generate_signals(ev_threshold: float = EV_THRESHOLD_DEFAULT, max_signals: in
                 continue
 
             candidates: List[Tuple[str, float, bool]] = []
-            if ev_yes >= ev_threshold:
-                candidates.append(("yes", ev_yes, False))
-            if ev_no >= ev_threshold:
-                candidates.append(("no", ev_no, False))
+            if allow_band:
+                # Primary rule flipped: prefer NO when price is 88-92%.
+                if ev_no >= ev_threshold:
+                    candidates.append(("no", ev_no, False))
+            else:
+                if ev_yes >= ev_threshold:
+                    candidates.append(("yes", ev_yes, False))
+                if ev_no >= ev_threshold:
+                    candidates.append(("no", ev_no, False))
 
             # Add override-driven signals
             if longshot_yes:
@@ -175,7 +180,7 @@ def generate_signals(ev_threshold: float = EV_THRESHOLD_DEFAULT, max_signals: in
             if longshot_college:
                 candidates.append(("yes", ev_yes, True))
             if pro_inplay_override and allow_band:
-                candidates.append(("yes", ev_yes, True))
+                candidates.append(("no", ev_no, True))
 
             for side, ev, forced in candidates:
                 cursor.execute(
