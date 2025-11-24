@@ -5,6 +5,20 @@ import operator
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Tuple, Iterable
 
+SPORT_TICKER_HINTS = (
+    "NFL",
+    "NBA",
+    "NHL",
+    "MLB",
+    "EPL",
+    "MLS",
+    "START",
+    "GAME",
+    "FOOTBALL",
+    "BASKETBALL",
+    "HOCKEY",
+)
+
 from psycopg2.extras import RealDictCursor
 
 from ..db import connection_ctx
@@ -80,11 +94,19 @@ def run_threshold_backtest(
             )
             markets = cursor.fetchall()
             for market in markets:
-                if category and (market.get("category") or "").lower() != category.lower():
-                    continue
                 cat_val = (market.get("category") or "").lower()
-                if allowed_cat_set is not None and cat_val not in allowed_cat_set:
+                ticker_upper = str(market.get("market_id") or "").upper()
+
+                if category and cat_val != category.lower():
                     continue
+                if allowed_cat_set is not None:
+                    if cat_val in allowed_cat_set:
+                        pass
+                    elif any(hint in ticker_upper for hint in SPORT_TICKER_HINTS):
+                        pass
+                    else:
+                        continue
+
                 if cutoff and market.get("expiration_ts") and market["expiration_ts"] < cutoff:
                     continue
                 if not _expiry_bucket_predicate(market.get("expiration_ts"), expiry_bucket):
