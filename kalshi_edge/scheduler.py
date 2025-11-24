@@ -14,6 +14,7 @@ from .backtest.results_store import (
 from .backtest.strategy_threshold import run_threshold_backtest
 from .ingest import historical_ingest
 from .signals.generate_signals import generate_signals
+from .signals.manage_signals import cancel_stale_signals
 from .execution.execute_signals import execute_signals
 from .execution.exit_positions import process_take_profit_exits
 from .portfolio.sync_positions import sync_positions
@@ -60,6 +61,14 @@ def minute_cycle() -> None:
         LOGGER.info("minute_cycle: executed %s signals", processed)
     except Exception:
         LOGGER.exception("minute_cycle: execute_signals failed")
+
+    try:
+        # Auto-cancel lingering open signals to free risk budget.
+        cancelled = cancel_stale_signals()
+        if cancelled:
+            LOGGER.info("minute_cycle: cancelled %s stale signals", cancelled)
+    except Exception:
+        LOGGER.exception("minute_cycle: cancel_stale_signals failed")
 
     try:
         # Refresh backtests/calibration so dashboard summaries stay current.
