@@ -30,6 +30,8 @@ HIGH_THRESHOLDS = [round(x / 100, 2) for x in range(80, 100)]
 CATEGORIES = [None]
 # To keep backtests fast for dashboard, only run unbucketed expiry.
 EXPIRY_BUCKETS = [None]
+BACKTEST_SINCE_HOURS = 24
+BACKTEST_ALLOWED_CATEGORIES = {"sports", "football", "basketball", "hockey", "nfl", "nba", "nhl"}
 
 
 def ingest_recent_data(lookback_hours: int = 1) -> None:
@@ -89,7 +91,12 @@ def run_all_backtests() -> None:
             # YES-buying thresholds
             for t in HIGH_THRESHOLDS:
                 stats, _ = run_threshold_backtest(
-                    threshold=t, direction="yes", category=cat, expiry_bucket=bucket
+                    threshold=t,
+                    direction="yes",
+                    category=cat,
+                    expiry_bucket=bucket,
+                    since_hours=BACKTEST_SINCE_HOURS,
+                    allowed_categories=BACKTEST_ALLOWED_CATEGORIES,
                 )
                 save_backtest_result(
                     strategy_name=f"threshold_yes_{t:.2f}",
@@ -114,7 +121,12 @@ def run_all_backtests() -> None:
             # NO-buying thresholds
             for t in LOW_THRESHOLDS:
                 stats, _ = run_threshold_backtest(
-                    threshold=t, direction="no", category=cat, expiry_bucket=bucket
+                    threshold=t,
+                    direction="no",
+                    category=cat,
+                    expiry_bucket=bucket,
+                    since_hours=BACKTEST_SINCE_HOURS,
+                    allowed_categories=BACKTEST_ALLOWED_CATEGORIES,
                 )
                 save_backtest_result(
                     strategy_name=f"threshold_no_{t:.2f}",

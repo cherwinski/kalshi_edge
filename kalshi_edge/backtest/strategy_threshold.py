@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import operator
 from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Tuple, Iterable
 
 from psycopg2.extras import RealDictCursor
 
@@ -48,6 +48,9 @@ def run_threshold_backtest(
     direction: str = "yes",
     category: str | None = None,
     expiry_bucket: str | None = None,
+    *,
+    since_hours: float | None = None,
+    allowed_categories: Iterable[str] | None = None,
 ) -> Tuple[Dict[str, Any], List[Dict[str, Any]]]:
     """
     Backtest a simple threshold rule.
@@ -62,6 +65,9 @@ def run_threshold_backtest(
 
     comparator = operator.ge if direction == "yes" else operator.le
     trades: List[Trade] = []
+    now = datetime.now(timezone.utc)
+    cutoff = now - timedelta(hours=since_hours) if since_hours else None
+    allowed_cat_set = {c.lower() for c in allowed_categories} if allowed_categories else None
 
     with connection_ctx() as conn:
         with conn.cursor(cursor_factory=RealDictCursor) as cursor:
@@ -75,6 +81,11 @@ def run_threshold_backtest(
             markets = cursor.fetchall()
             for market in markets:
                 if category and (market.get("category") or "").lower() != category.lower():
+                    continue
+                cat_val = (market.get("category") or "").lower()
+                if allowed_cat_set is not None and cat_val not in allowed_cat_set:
+                    continue
+                if cutoff and market.get("expiration_ts") and market["expiration_ts"] < cutoff:
                     continue
                 if not _expiry_bucket_predicate(market.get("expiration_ts"), expiry_bucket):
                     continue
