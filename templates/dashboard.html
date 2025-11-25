@@ -155,50 +155,66 @@
         <th style="text-align: left; padding: 4px;">Time</th>
         <th style="text-align: left; padding: 4px;">Market</th>
         <th style="text-align: left; padding: 4px;">Side</th>
-        <th style="text-align: left; padding: 4px;">Category</th>
-        <th style="text-align: left; padding: 4px;">Expiry</th>
-        <th style="text-align: left; padding: 4px;">p_mkt</th>
-        <th style="text-align: left; padding: 4px;">p_true</th>
-        <th style="text-align: left; padding: 4px;">EV</th>
-        <th style="text-align: left; padding: 4px;">Size</th>
+        <th style="text-align: right; padding: 4px;">p_mkt</th>
+        <th style="text-align: right; padding: 4px;">p_true</th>
+        <th style="text-align: right; padding: 4px;">EV</th>
+        <th style="text-align: right; padding: 4px;">Size</th>
         <th style="text-align: left; padding: 4px;">Status</th>
-        <th style="text-align: left; padding: 4px;">Rule</th>
-        <th style="text-align: left; padding: 4px;">Exec Mode</th>
-        <th style="text-align: left; padding: 4px;">Order ID</th>
-        <th style="text-align: left; padding: 4px;">Exec Price</th>
+        <th style="text-align: left; padding: 4px;">Exec mode</th>
         <th style="text-align: left; padding: 4px;">Error</th>
       </tr>
     </thead>
     <tbody id="signals-body">
       {% for sig in signals %}
-      <tr>
-        <td style="padding: 4px;">{{ sig.created_at }}</td>
+      {% set ev = sig.expected_value %}
+      {% set ev_class = '' %}
+      {% if ev > 0 %}
+        {% set ev_class = 'text-success' %}
+      {% elif ev < 0 %}
+        {% set ev_class = 'text-danger' %}
+      {% endif %}
+      {% set status_label = (sig.status or '').lower() %}
+      {% if status_label == 'executed' %}
+        {% set status_class = 'tag tag-live' %}
+      {% elif status_label == 'resting' %}
+        {% set status_class = 'tag' %}
+      {% elif status_label in ['ignored','error'] %}
+        {% set status_class = 'tag text-danger' %}
+      {% else %}
+        {% set status_class = 'tag' %}
+      {% endif %}
+      {% set exec_label = (sig.execution_mode or '').lower() %}
+      {% if exec_label == 'live' %}
+        {% set exec_class = 'tag tag-live' %}
+      {% else %}
+        {% set exec_class = 'tag' %}
+      {% endif %}
+      {% set ts = sig.created_at %}
+      {% set ts_str = ts[:16] if ts else '' %}
+      {% set title_text = "Category: %s • Expiry: %s • Rule: %s • Order: %s • Exec: %s" % (
+        sig.category or "",
+        sig.expiry_bucket or "",
+        sig.rule or "",
+        sig.order_id or "",
+        sig.executed_price if sig.executed_price is not none else ""
+      ) %}
+      <tr
+        data-category="{{ sig.category or '' }}"
+        data-expiry="{{ sig.expiry_bucket or '' }}"
+        data-rule="{{ sig.rule or '' }}"
+        data-order-id="{{ sig.order_id or '' }}"
+        data-exec-price="{{ sig.executed_price if sig.executed_price is not none else '' }}"
+        title="{{ title_text }}"
+      >
+        <td style="padding: 4px;" title="{{ sig.created_at }}">{{ ts_str }}</td>
         <td style="padding: 4px;">{{ sig.market_ticker }}</td>
-        <td style="padding: 4px; text-transform: uppercase;">{{ sig.side }}</td>
-        <td style="padding: 4px;">{{ sig.category or "" }}</td>
-        <td style="padding: 4px;">{{ sig.expiry_bucket or "" }}</td>
-        <td style="padding: 4px;">{{ "%.3f"|format(sig.p_mkt) }}</td>
-        <td style="padding: 4px;">{{ "%.3f"|format(sig.p_true_est) }}</td>
-        {% set ev = sig.expected_value %}
-        {% set ev_color = "#c62828" %}
-        {% if ev >= 0.05 %}
-          {% set ev_color = "#1b5e20" %}
-        {% elif ev >= 0.02 %}
-          {% set ev_color = "#2e7d32" %}
-        {% elif ev >= 0 %}
-          {% set ev_color = "#43a047" %}
-        {% elif ev >= -0.02 %}
-          {% set ev_color = "#ef6c00" %}
-        {% else %}
-          {% set ev_color = "#c62828" %}
-        {% endif %}
-        <td style="padding: 4px; color: {{ ev_color }};">{{ "%.4f"|format(ev) }}</td>
-        <td style="padding: 4px;">{{ sig.size }}</td>
-        <td style="padding: 4px;">{{ sig.status }}</td>
-        <td style="padding: 4px;">{{ sig.rule }}</td>
-        <td style="padding: 4px;">{{ sig.execution_mode or "" }}</td>
-        <td style="padding: 4px;">{{ sig.order_id or "" }}</td>
-        <td style="padding: 4px;">{{ sig.executed_price if sig.executed_price is not none else "" }}</td>
+        <td style="padding: 4px;">{{ (sig.side or '').upper() }}</td>
+        <td style="padding: 4px; text-align:right;">{{ "%.3f"|format(sig.p_mkt) }}</td>
+        <td style="padding: 4px; text-align:right;">{{ "%.3f"|format(sig.p_true_est) }}</td>
+        <td style="padding: 4px; text-align:right;" class="{{ ev_class }}">{{ "%.4f"|format(ev) }}</td>
+        <td style="padding: 4px; text-align:right;">{{ sig.size }}</td>
+        <td style="padding: 4px;"><span class="{{ status_class }}">{{ (sig.status or '').capitalize() }}</span></td>
+        <td style="padding: 4px;"><span class="{{ exec_class }}">{{ (sig.execution_mode or '').capitalize() }}</span></td>
         <td style="padding: 4px;">{{ sig.last_error or "" }}</td>
       </tr>
       {% endfor %}
