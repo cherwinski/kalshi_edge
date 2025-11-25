@@ -199,14 +199,11 @@ def _insert_quote_snapshot(cursor, client: KalshiSDKClient, market_id: str) -> i
         return payload.get("market") or payload
 
     try:
-        # Prefer raw HTTP to avoid SDK validation failures (e.g., status='finalized').
+        # Use raw HTTP to avoid SDK validation failures (e.g., status='finalized').
         quote = _fetch_raw_market(market_id)
-    except Exception:
-        try:
-            quote = client.markets_api.get_market(ticker=market_id)
-        except Exception as exc2:  # pragma: no cover - defensive fallback
-            LOGGER.warning("Snapshot fetch failed for %s: %s", market_id, exc2)
-            return 0
+    except Exception as exc:
+        LOGGER.warning("Snapshot fetch failed for %s: %s", market_id, exc)
+        return 0
 
     market = getattr(quote, "market", quote)
 
