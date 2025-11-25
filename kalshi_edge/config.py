@@ -168,7 +168,10 @@ def get_current_bankroll_usd(conn) -> float:
             row = cur.fetchone()
         if row is None:
             return initial
-        return float(row[0])
+        val = float(row[0])
+        if val <= 0:
+            return initial
+        return val
     except Exception:
         return initial
 
