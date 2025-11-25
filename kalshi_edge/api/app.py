@@ -207,6 +207,7 @@ def get_signal_status_summary() -> Dict[str, Any]:
     conn = get_connection()
     counts: Dict[str, int] = {}
     latest_ts = None
+    resting_risk = 0.0
     try:
         cur = conn.cursor()
         cur.execute(
@@ -223,6 +224,31 @@ def get_signal_status_summary() -> Dict[str, Any]:
         row = cur.fetchone()
         if row and row[0]:
             latest_ts = row[0]
+
+        # Compute approximate risk for resting orders.
+        cur.execute(
+            """
+            SELECT side, p_mkt, size
+            FROM signals
+            WHERE status = 'resting'
+            """
+        )
+        for side, p_mkt, size in cur.fetchall():
+            try:
+                price = float(p_mkt or 0.0)
+            except Exception:
+                price = 0.0
+            if price > 1.0:
+                price = price / 100.0
+            if price < 0:
+                price = 0.0
+            sz = abs(int(size or 0))
+            if sz <= 0:
+                continue
+            if (side or "").lower() == "no":
+                resting_risk += (1.0 - price) * sz
+            else:
+                resting_risk += price * sz
     finally:
         conn.close()
 
@@ -240,6 +266,7 @@ def get_signal_status_summary() -> Dict[str, Any]:
         "counts": counts,
         "latest_created_at": latest_ts.isoformat() if latest_ts else None,
         "message": message,
+        "resting_risk": resting_risk,
     }
 
 
