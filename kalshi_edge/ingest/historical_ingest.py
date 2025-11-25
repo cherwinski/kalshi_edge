@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import json
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, Iterable, List, Optional, Sequence
 
@@ -202,7 +203,7 @@ def _insert_quote_snapshot(cursor, client: KalshiSDKClient, market_id: str) -> i
         # Use raw HTTP to avoid SDK validation failures (e.g., status='finalized').
         quote = _fetch_raw_market(market_id)
     except Exception as exc:
-        LOGGER.warning("Snapshot fetch failed for %s: %s", market_id, exc)
+        LOGGER.warning("Snapshot fetch failed for %s: %s", market_id, exc, exc_info=True)
         return 0
 
     market = getattr(quote, "market", quote)
