@@ -8,7 +8,7 @@
          + (signal_status.counts.resting or 0)
          + (signal_status.counts.sent or 0)
          + (signal_status.counts.simulated or 0) }}</p>
-    <p><strong>Resting orders:</strong> {{ signal_status.counts.resting or 0 }} (est. risk ${{ "%.2f"|format(signal_status.resting_risk or 0) }})</p>
+    <p><strong>Resting orders:</strong> {{ signal_status.counts.resting or 0 }} (est. risk ${{ "%.2f"|format(signal_status.resting_risk or 0) }}, est. cost ${{ "%.2f"|format(signal_status.open_order_cost or 0) }})</p>
     <p><strong>Executed:</strong> {{ signal_status.counts.executed or 0 }}</p>
     <p><strong>Ignored:</strong> {{ signal_status.counts.ignored or 0 }}</p>
     <p><strong>Errors:</strong> {{ signal_status.counts.error or 0 }}</p>

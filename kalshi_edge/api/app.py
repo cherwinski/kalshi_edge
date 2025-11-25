@@ -208,6 +208,7 @@ def get_signal_status_summary() -> Dict[str, Any]:
     counts: Dict[str, int] = {}
     latest_ts = None
     resting_risk = 0.0
+    open_order_cost = 0.0
     try:
         cur = conn.cursor()
         cur.execute(
@@ -247,8 +248,10 @@ def get_signal_status_summary() -> Dict[str, Any]:
                 continue
             if (side or "").lower() == "no":
                 resting_risk += (1.0 - price) * sz
+                open_order_cost += (1.0 - price) * sz
             else:
                 resting_risk += price * sz
+                open_order_cost += price * sz
     finally:
         conn.close()
 
@@ -267,6 +270,7 @@ def get_signal_status_summary() -> Dict[str, Any]:
         "latest_created_at": latest_ts.isoformat() if latest_ts else None,
         "message": message,
         "resting_risk": resting_risk,
+        "open_order_cost": open_order_cost,
     }
 
 
