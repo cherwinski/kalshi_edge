@@ -69,9 +69,8 @@
   {% endif %}
 </section>
 <section class="chart-container">
-  <h2>Calibration <small>(Samples: <span id="calibration-count">--</span>)</small></h2>
-  <canvas id="calibrationChart"></canvas>
-  <p id="calibration-error" style="color: red; display: none;">Error loading calibration data.</p>
+  <h2>Calibration</h2>
+  <p>Calibration chart temporarily disabled (CSP blocks eval). Calibration samples: {{ calibration|length if calibration else 0 }}</p>
 </section>
 
 <section class="card" style="margin-top: 1rem;">
@@ -110,8 +109,7 @@
 
 <section class="card" style="margin-top: 1rem;">
   <h2>Equity Curve</h2>
-  <canvas id="pnlChart"></canvas>
-  <p id="pnl-error" style="color:red; display:none;">Error loading PnL data.</p>
+  <p>Equity chart temporarily disabled (CSP blocks eval). Latest equity: {{ pnl_series[-1].total_equity if pnl_series else 'N/A' }}</p>
 </section>
 
 <section class="card" style="margin-top: 1rem;">
@@ -226,87 +224,6 @@
   <p id="signals-error" style="color:red; display:none;">Error loading signals.</p>
 </section>
 <script>
-  async function loadCalibration() {
-    try {
-      const res = await fetch('/calibration');
-      if (!res.ok) throw new Error('Failed to load calibration');
-      const buckets = await res.json();
-      const totalSamples = buckets.reduce((acc, b) => acc + (b.n || 0), 0);
-      const countEl = document.getElementById('calibration-count');
-      if (countEl) countEl.textContent = totalSamples;
-      const xs = buckets.map(b => (b.bucket_low + b.bucket_high) / 2);
-      const ys = buckets.map(b => b.p_true ?? 0);
-      const perfect = xs;
-
-      const ctx = document.getElementById('calibrationChart').getContext('2d');
-      new Chart(ctx, {
-        type: 'line',
-        data: {
-          labels: xs,
-          datasets: [
-            {
-              label: 'Observed',
-              data: ys,
-              borderColor: 'rgba(54, 162, 235, 1)',
-              backgroundColor: 'rgba(54, 162, 235, 0.2)',
-              fill: false,
-            },
-            {
-              label: 'Perfect calibration',
-              data: perfect,
-              borderColor: 'rgba(200, 200, 200, 1)',
-              borderDash: [5, 5],
-              fill: false,
-            },
-          ],
-        },
-        options: {
-          responsive: true,
-          scales: {
-            x: { title: { display: true, text: 'Market-implied probability' } },
-            y: { title: { display: true, text: 'Empirical YES frequency' }, min: 0, max: 1 },
-          },
-        },
-      });
-    } catch (err) {
-      console.error(err);
-      document.getElementById('calibration-error').style.display = 'block';
-    }
-  }
-
-  function loadPnlChart() {
-    const series = {{ pnl_series|tojson }};
-    if (!series || series.length === 0) {
-      document.getElementById('pnl-error').style.display = 'block';
-      return;
-    }
-    const labels = series.map(p => p.as_of_date);
-    const realized = series.map(p => p.realized_pnl);
-    const unrealized = series.map(p => p.unrealized_pnl);
-    const equity = series.map(p => p.total_equity);
-    const ctx = document.getElementById('pnlChart').getContext('2d');
-    new Chart(ctx, {
-      type: 'line',
-      data: {
-        labels,
-        datasets: [
-          { label: 'Equity', data: equity, borderColor: 'rgba(75, 192, 192, 1)', fill: false },
-          { label: 'Realized', data: realized, borderColor: 'rgba(54, 162, 235, 1)', borderDash: [4, 4], fill: false },
-          { label: 'Unrealized', data: unrealized, borderColor: 'rgba(255, 159, 64, 1)', borderDash: [2, 6], fill: false },
-        ],
-      },
-      options: {
-        responsive: true,
-        scales: {
-          x: { title: { display: true, text: 'Date' } },
-          y: { title: { display: true, text: 'PnL / Equity (USD)' } },
-        },
-      },
-    });
-  }
-
-  loadCalibration();
-  loadPnlChart();
 
   async function cancelOpenSignals() {
     try {
