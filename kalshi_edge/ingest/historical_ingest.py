@@ -188,7 +188,23 @@ def _insert_quote_snapshot(cursor, client: KalshiSDKClient, market_id: str) -> i
         quote = client.markets_api.get_market(ticker=market_id)
     except Exception as exc:  # pragma: no cover - defensive fallback
         LOGGER.warning("Snapshot fetch failed for %s: %s", market_id, exc)
-        return 0
+        # Fallback: raw HTTP to tolerate enum drift (e.g., status 'finalized')
+        try:
+            url = f"{client.api_client.configuration.host}/markets/{market_id}"
+            raw = client.api_client.call_api(
+                method="GET",
+                url=url,
+                header_params=dict(client.api_client.default_headers),
+                _request_timeout=client.request_timeout,
+            )
+            body = raw.data or raw.read()
+            if not body:
+                raise RuntimeError(f"Empty response from {url} (status={raw.status})")
+            payload = json.loads(body.decode("utf-8"))
+            quote = payload.get("market") or payload
+        except Exception as exc2:
+            LOGGER.warning("Raw snapshot fetch also failed for %s: %s", market_id, exc2)
+            return 0
 
     market = getattr(quote, "market", quote)
 
