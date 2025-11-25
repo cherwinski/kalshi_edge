@@ -190,7 +190,7 @@
         {% set exec_class = 'tag' %}
       {% endif %}
       {% set ts = sig.created_at %}
-      {% set ts_str = ts[:16] if ts else '' %}
+      {% set ts_str = ts.strftime('%Y-%m-%d %H:%M') if ts is not none else '' %}
       {% set title_text = "Category: %s • Expiry: %s • Rule: %s • Order: %s • Exec: %s" % (
         sig.category or "",
         sig.expiry_bucket or "",
