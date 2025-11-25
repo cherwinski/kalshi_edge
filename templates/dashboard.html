@@ -178,7 +178,20 @@
         <td style="padding: 4px;">{{ sig.expiry_bucket or "" }}</td>
         <td style="padding: 4px;">{{ "%.3f"|format(sig.p_mkt) }}</td>
         <td style="padding: 4px;">{{ "%.3f"|format(sig.p_true_est) }}</td>
-        <td style="padding: 4px;">{{ "%.4f"|format(sig.expected_value) }}</td>
+        {% set ev = sig.expected_value %}
+        {% set ev_color = "#c62828" %}
+        {% if ev >= 0.05 %}
+          {% set ev_color = "#1b5e20" %}
+        {% elif ev >= 0.02 %}
+          {% set ev_color = "#2e7d32" %}
+        {% elif ev >= 0 %}
+          {% set ev_color = "#43a047" %}
+        {% elif ev >= -0.02 %}
+          {% set ev_color = "#ef6c00" %}
+        {% else %}
+          {% set ev_color = "#c62828" %}
+        {% endif %}
+        <td style="padding: 4px; color: {{ ev_color }};">{{ "%.4f"|format(ev) }}</td>
         <td style="padding: 4px;">{{ sig.size }}</td>
         <td style="padding: 4px;">{{ sig.status }}</td>
         <td style="padding: 4px;">{{ sig.rule }}</td>
