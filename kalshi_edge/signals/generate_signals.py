@@ -1,6 +1,7 @@
 """Generate trading signals based on calibration-adjusted probabilities."""
 from __future__ import annotations
 
+import re
 from datetime import datetime, timezone, timedelta
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
@@ -24,6 +25,21 @@ PRO_INPLAY_BAND_HIGH = 0.92
 SPORTS_INPLAY_MAX_REMAINING = timedelta(minutes=30)
 SPORT_TICKER_HINTS = ("NFL", "NBA", "NHL", "MLB", "EPL", "MLS", "NCAAF", "NCAAB", "START", "GAME")
 WEATHER_MIN_P = 0.03
+DATE_TOKEN_RE = re.compile(r"(\d{1,2})([A-Z]{3})(\d{2})")
+MONTH_MAP = {
+    "JAN": 1,
+    "FEB": 2,
+    "MAR": 3,
+    "APR": 4,
+    "MAY": 5,
+    "JUN": 6,
+    "JUL": 7,
+    "AUG": 8,
+    "SEP": 9,
+    "OCT": 10,
+    "NOV": 11,
+    "DEC": 12,
+}
 
 
 def _build_probability_lookup() -> Callable[[float], float]:
@@ -72,13 +88,34 @@ def _latest_prices(cursor: RealDictCursor) -> List[Dict[str, Any]]:
 def _market_meta(cursor: RealDictCursor, market_ids: List[str]) -> Dict[str, Dict[str, Any]]:
     cursor.execute(
         """
-        SELECT market_id, category, expiration_ts
+        SELECT market_id, name, category, expiration_ts
         FROM markets
         WHERE market_id = ANY(%s)
         """,
         (market_ids,),
     )
     return {row["market_id"]: row for row in cursor.fetchall()}
+
+
+def _parse_market_date(text: Optional[str]) -> Optional[datetime]:
+    """Parse a date token like 25NOV24 from market text, adjusting to game day."""
+
+    if not text:
+        return None
+    match = DATE_TOKEN_RE.search(text.upper())
+    if not match:
+        return None
+    day_str, month_code, year_str = match.groups()
+    try:
+        day = int(day_str)
+        month = MONTH_MAP[month_code]
+        year = 2000 + int(year_str)
+    except (KeyError, ValueError):
+        return None
+
+    # Kalshi sports tickers typically encode the settlement day; shift back to game day.
+    parsed = datetime(year, month, day, 23, 59, tzinfo=timezone.utc) - timedelta(days=1)
+    return parsed
 
 
 def _expiry_bucket(expiration_ts: Optional[datetime]) -> Optional[str]:
@@ -99,7 +136,7 @@ def generate_signals(ev_threshold: float = EV_THRESHOLD_DEFAULT, max_signals: in
     p_true_fn = _build_probability_lookup()
     created = 0
     now = datetime.now(timezone.utc)
-    hard_cutoff = now + timedelta(hours=EXPIRY_HARD_LIMIT_HOURS)
+    hard_cutoff_default = now + timedelta(hours=EXPIRY_HARD_LIMIT_HOURS)
 
     with get_connection() as conn, conn.cursor(cursor_factory=RealDictCursor) as cursor:
         prices = _latest_prices(cursor)
@@ -119,14 +156,6 @@ def generate_signals(ev_threshold: float = EV_THRESHOLD_DEFAULT, max_signals: in
 
             info = meta.get(market_id, {})
             cat = info.get("category")
-            exp_ts = info.get("expiration_ts")
-            # Hard 24h expiry rule: skip anything without an expiry, already expired,
-            # or beyond the cutoff window.
-            if not exp_ts or exp_ts < now or exp_ts > hard_cutoff:
-                LOGGER.debug("Skipping %s due to expiry outside 24h window (exp_ts=%s)", market_id, exp_ts)
-                continue
-            bucket = _expiry_bucket(exp_ts)
-
             cat_lower = (cat or "").lower()
             ticker_upper = market_id.upper()
             is_pro_sport = cat_lower in PRO_SPORTS_CATEGORIES
@@ -137,6 +166,27 @@ def generate_signals(ev_threshold: float = EV_THRESHOLD_DEFAULT, max_signals: in
                 or ("sport" in cat_lower)
                 or any(hint in ticker_upper for hint in SPORT_TICKER_HINTS)
             )
+
+            market_name = info.get("name") or market_id
+            parsed_exp_ts = None
+            if is_sport_any:
+                parsed_exp_ts = _parse_market_date(market_name) or _parse_market_date(market_id)
+                if parsed_exp_ts and parsed_exp_ts < now:
+                    parsed_exp_ts = None
+            exp_candidates = [ts for ts in (info.get("expiration_ts"), parsed_exp_ts) if ts]
+            exp_ts = min(exp_candidates) if exp_candidates else None
+            hard_cutoff = parsed_exp_ts or hard_cutoff_default
+            if not exp_ts or exp_ts < now or exp_ts > hard_cutoff:
+                LOGGER.debug(
+                    "Skipping %s due to expiry window (exp_ts=%s, cutoff=%s, name=%s)",
+                    market_id,
+                    exp_ts,
+                    hard_cutoff,
+                    market_name,
+                )
+                continue
+            bucket = _expiry_bucket(exp_ts)
+
             price = float(p_mkt)
 
             # Skip low-probability weather markets (<3%).
