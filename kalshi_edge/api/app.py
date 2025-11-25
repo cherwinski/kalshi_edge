@@ -143,6 +143,26 @@ def list_signals(limit: int = 100) -> List[Dict[str, Any]]:
     return get_recent_signals(limit=limit)
 
 
+@app.post("/signals/cancel_open")
+def cancel_open_signals() -> Dict[str, Any]:
+    """Cancel pending/resting/sent/simulated signals to free budget."""
+
+    with get_connection() as conn, conn.cursor() as cur:
+        cur.execute(
+            """
+            UPDATE signals
+            SET status = 'cancelled',
+                last_error = 'cancelled via dashboard',
+                executed_price = COALESCE(executed_price, 0),
+                executed_size = COALESCE(executed_size, 0)
+            WHERE status IN ('pending','resting','sent','simulated')
+            """
+        )
+        cancelled = cur.rowcount
+        conn.commit()
+    return {"cancelled": cancelled}
+
+
 def get_signal_status_summary() -> Dict[str, Any]:
     """Return counts by status and the latest signal timestamp."""
 

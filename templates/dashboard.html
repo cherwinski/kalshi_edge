@@ -14,6 +14,7 @@
     {% if signal_status.message %}
       <p style="color: #c00;">{{ signal_status.message }}</p>
     {% endif %}
+    <button onclick="cancelOpenSignals()" style="margin-top:8px;">Cancel Open Signals</button>
   {% else %}
     <p>No signal data yet.</p>
   {% endif %}
@@ -271,5 +272,18 @@
 
   loadCalibration();
   loadPnlChart();
+
+  async function cancelOpenSignals() {
+    try {
+      const res = await fetch('/signals/cancel_open', { method: 'POST' });
+      if (!res.ok) throw new Error('Failed to cancel signals');
+      const data = await res.json();
+      alert(`Cancelled ${data.cancelled} open signals`);
+      window.location.reload();
+    } catch (err) {
+      console.error(err);
+      alert('Error cancelling signals');
+    }
+  }
 </script>
 {% endblock %}
