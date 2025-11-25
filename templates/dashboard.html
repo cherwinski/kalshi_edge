@@ -14,7 +14,12 @@
     {% if signal_status.message %}
       <p style="color: #c00;">{{ signal_status.message }}</p>
     {% endif %}
-    <button onclick="cancelOpenSignals()" style="margin-top:8px;">Cancel Open Signals</button>
+    <div style="margin-top:8px;">
+      <button onclick="cancelOpenSignals()">Cancel Open Signals</button>
+      <button onclick="generateSignals()">Generate Signals</button>
+      <button onclick="executeSignals()">Execute Signals</button>
+      <button onclick="resetBudget()">Reset Budget</button>
+    </div>
   {% else %}
     <p>No signal data yet.</p>
   {% endif %}
@@ -279,11 +284,50 @@
       if (!res.ok) throw new Error('Failed to cancel signals');
       const data = await res.json();
       alert(`Cancelled ${data.cancelled} open signals`);
-      window.location.reload();
     } catch (err) {
       console.error(err);
       alert('Error cancelling signals');
     }
+    window.location.reload();
+  }
+
+  async function generateSignals() {
+    try {
+      const res = await fetch('/admin/generate_signals', { method: 'POST' });
+      if (!res.ok) throw new Error('Failed to generate signals');
+      const data = await res.json();
+      alert(`Generated ${data.created} signals`);
+    } catch (err) {
+      console.error(err);
+      alert('Error generating signals');
+    }
+    window.location.reload();
+  }
+
+  async function executeSignals() {
+    try {
+      const res = await fetch('/admin/execute_signals', { method: 'POST' });
+      if (!res.ok) throw new Error('Failed to execute signals');
+      const data = await res.json();
+      alert(`Processed ${data.processed} signals`);
+    } catch (err) {
+      console.error(err);
+      alert('Error executing signals');
+    }
+    window.location.reload();
+  }
+
+  async function resetBudget() {
+    try {
+      const res = await fetch('/admin/reset_budget', { method: 'POST' });
+      if (!res.ok) throw new Error('Failed to reset budget');
+      const data = await res.json();
+      alert(`Budget reset to ${data.total_equity}`);
+    } catch (err) {
+      console.error(err);
+      alert('Error resetting budget');
+    }
+    window.location.reload();
   }
 </script>
 {% endblock %}

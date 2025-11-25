@@ -15,6 +15,9 @@ from ..backtest.results_store import (
     list_calibration_results,
 )
 from ..db import get_connection
+from ..signals.generate_signals import generate_signals
+from ..execution.execute_signals import execute_signals
+from ..config import get_initial_bankroll_usd
 
 app = FastAPI(title="Kalshi Edge Dashboard")
 templates = Jinja2Templates(directory=str(Path(__file__).resolve().parent.parent.parent / "templates"))
@@ -161,6 +164,41 @@ def cancel_open_signals() -> Dict[str, Any]:
         cancelled = cur.rowcount
         conn.commit()
     return {"cancelled": cancelled}
+
+
+@app.post("/admin/generate_signals")
+def admin_generate_signals() -> Dict[str, Any]:
+    """Trigger signal generation."""
+
+    created = generate_signals()
+    return {"created": created}
+
+
+@app.post("/admin/execute_signals")
+def admin_execute_signals() -> Dict[str, Any]:
+    """Trigger execution of pending signals."""
+
+    processed = execute_signals()
+    return {"processed": processed}
+
+
+@app.post("/admin/reset_budget")
+def admin_reset_budget() -> Dict[str, Any]:
+    """Reset account_pnl to initial bankroll."""
+
+    initial = get_initial_bankroll_usd()
+    today = datetime.now(timezone.utc).date()
+    with get_connection() as conn, conn.cursor() as cur:
+        cur.execute("TRUNCATE account_pnl;")
+        cur.execute(
+            """
+            INSERT INTO account_pnl (as_of_date, realized_pnl, unrealized_pnl, total_equity, created_at)
+            VALUES (%s, %s, %s, %s, NOW())
+            """,
+            (today, 0.0, 0.0, initial),
+        )
+        conn.commit()
+    return {"reset": True, "total_equity": initial}
 
 
 def get_signal_status_summary() -> Dict[str, Any]:
